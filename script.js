@@ -191,6 +191,8 @@ function renderTables() {
     saveTasks();
 }
 
+let sortDirection = {}; 
+
 window.sortTable = function(key) {
     let direction = sortDirection[key] === 'asc' ? 'desc' : 'asc';
     sortDirection[key] = direction;
@@ -250,46 +252,59 @@ function handleTaskAction(event) {
 }
 
 
-// --- Form Submission ---
+// --- Form Submission (Registered separately below) ---
 
-document.getElementById('task-form').addEventListener('submit', function(event) {
-    event.preventDefault();
+function registerFormListener() {
+    document.getElementById('task-form').addEventListener('submit', function(event) {
+        event.preventDefault();
 
-    let lastCompletedDate = document.getElementById('lastCompleted').value;
-    const targetDueDate = document.getElementById('targetDueDate').value;
-    const frequency = parseInt(document.getElementById('frequencyDays').value);
-    
-    if (!lastCompletedDate) {
-        if (targetDueDate) {
-            const targetDate = new Date(targetDueDate);
-            const initialLastCompleted = new Date(targetDate);
-            initialLastCompleted.setDate(targetDate.getDate() - frequency);
-            lastCompletedDate = formatDate(initialLastCompleted);
-        } else {
-            const today = new Date();
-            const initialLastCompleted = new Date(today);
-            initialLastCompleted.setDate(today.getDate() + 7 - frequency);
-            lastCompletedDate = formatDate(initialLastCompleted);
+        let lastCompletedDate = document.getElementById('lastCompleted').value;
+        const targetDueDate = document.getElementById('targetDueDate').value;
+        const frequency = parseInt(document.getElementById('frequencyDays').value);
+        
+        if (isNaN(frequency)) {
+            alert("Please enter a valid Frequency (Days).");
+            return;
         }
-    }
 
-    const newTask = {
-        taskName: document.getElementById('taskName').value,
-        category: document.getElementById('category').value,
-        description: document.getElementById('description').value,
-        frequencyDays: frequency,
-        lastCompleted: lastCompletedDate, 
-    };
-    
-    taskData.push(newTask);
-    sortTable('dueDate'); 
-    document.getElementById('task-form').reset();
-});
+        if (!lastCompletedDate) {
+            if (targetDueDate) {
+                const targetDate = new Date(targetDueDate);
+                const initialLastCompleted = new Date(targetDate);
+                initialLastCompleted.setDate(targetDate.getDate() - frequency);
+                lastCompletedDate = formatDate(initialLastCompleted);
+            } else {
+                const today = new Date();
+                const initialLastCompleted = new Date(today);
+                initialLastCompleted.setDate(today.getDate() + 7 - frequency);
+                lastCompletedDate = formatDate(initialLastCompleted);
+            }
+        }
+
+        const newTask = {
+            taskName: document.getElementById('taskName').value,
+            category: document.getElementById('category').value,
+            description: document.getElementById('description').value,
+            frequencyDays: frequency,
+            lastCompleted: lastCompletedDate, 
+        };
+        
+        taskData.push(newTask);
+        sortTable('dueDate'); 
+        document.getElementById('task-form').reset();
+    });
+}
+
 
 // --- Initialization ---
 
 function initTracker() {
     loadTasks();
     setupCalendarControls();
+    registerFormListener();
     sortTable('dueDate');
 }
+
+
+
+
