@@ -252,7 +252,7 @@ function handleTaskAction(event) {
 }
 
 
-// --- Form Submission (Registered separately below) ---
+// --- Form Submission (CRITICAL SECTION WITH DATE FIX) ---
 
 function registerFormListener() {
     document.getElementById('task-form').addEventListener('submit', function(event) {
@@ -269,11 +269,16 @@ function registerFormListener() {
 
         if (!lastCompletedDate) {
             if (targetDueDate) {
+                // CORRECTED LOGIC: Set theoretical "last completed" date one cycle before the target
                 const targetDate = new Date(targetDueDate);
                 const initialLastCompleted = new Date(targetDate);
+                
+                // Subtract the frequency in days from the target date
                 initialLastCompleted.setDate(targetDate.getDate() - frequency);
+                
                 lastCompletedDate = formatDate(initialLastCompleted);
             } else {
+                // Default: Due in 7 days from today
                 const today = new Date();
                 const initialLastCompleted = new Date(today);
                 initialLastCompleted.setDate(today.getDate() + 7 - frequency);
@@ -304,7 +309,4 @@ function initTracker() {
     registerFormListener();
     sortTable('dueDate');
 }
-
-
-
 
