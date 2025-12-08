@@ -15,9 +15,18 @@ function formatDate(date) {
     return [year, month, day].join('-');
 }
 
+// Helper to create a date object correctly from YYYY-MM-DD string
+function createLocalDate(dateString) {
+    const parts = dateString.split('-').map(p => parseInt(p, 10));
+    // Use local time components to avoid UTC shift
+    return new Date(parts[0], parts[1] - 1, parts[2]);
+}
+
 function calculateDueDate(lastCompletedDate, frequencyDays) {
     if (!lastCompletedDate) return null;
-    const lastDate = new Date(lastCompletedDate);
+    
+    // Use the custom function to safely create the date object
+    const lastDate = createLocalDate(lastCompletedDate);
     const nextDate = new Date(lastDate);
     nextDate.setDate(lastDate.getDate() + parseInt(frequencyDays));
     return nextDate;
@@ -269,8 +278,8 @@ function registerFormListener() {
 
         if (!lastCompletedDate) {
             if (targetDueDate) {
-                // CORRECTED LOGIC: Set theoretical "last completed" date one cycle before the target
-                const targetDate = new Date(targetDueDate);
+                // CORRECTED LOGIC: Use createLocalDate to ensure the date is handled locally.
+                const targetDate = createLocalDate(targetDueDate);
                 const initialLastCompleted = new Date(targetDate);
                 
                 // Subtract the frequency in days from the target date
@@ -309,4 +318,5 @@ function initTracker() {
     registerFormListener();
     sortTable('dueDate');
 }
+
 
