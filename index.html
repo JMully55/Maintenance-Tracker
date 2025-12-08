@@ -1,0 +1,102 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Maintenance Task Tracker</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body onload="initTracker()">
+
+    <div class="container">
+        <h1>Maintenance Task Tracker 🗓️</h1>
+
+        <form id="task-form">
+            <div>
+                <label for="taskName">Task Name:</label>
+                <input type="text" id="taskName" required>
+            </div>
+            <div>
+                <label for="category">Category:</label>
+                <select id="category" required>
+                    <option value="">-- Select Category --</option>
+                    <option value="Home">Home</option>
+                    <option value="Vehicle">Vehicle</option>
+                    <option value="Personal">Personal</option>
+                    <option value="Other">Other</option>
+                </select>
+            </div>
+            <div>
+                <label for="frequencyDays">Frequency (Days):</label>
+                <input type="number" id="frequencyDays" min="1" required>
+            </div>
+            <div style="grid-column: 1 / 3;">
+                <label for="description">Description:</label>
+                <textarea id="description" rows="2"></textarea>
+            </div>
+            <div>
+                <label for="lastCompleted">Last Completed Date (If done previously):</label>
+                <input type="date" id="lastCompleted"> 
+            </div>
+            <div>
+                <label for="targetDueDate">OR Target Next Due Date (For initialization):</label>
+                <input type="date" id="targetDueDate"> 
+            </div>
+            <button type="submit" style="grid-column: 1 / -1;">Add Task</button>
+        </form>
+
+        ---
+
+        <h2>🗓️ Maintenance Schedule Calendar</h2>
+        <div id="calendar-controls">
+            <label for="month-select">Month:</label>
+            <select id="month-select" onchange="renderCalendar()"></select>
+            
+            <label for="year-select">Year:</label>
+            <select id="year-select" onchange="renderCalendar()"></select>
+        </div>
+        
+        <div id="calendar-view">
+            </div>
+
+        ---
+
+        <h2>⚠️ Tasks Coming Up (Due/Overdue within 30 days)</h2>
+        <p>Use the buttons to <strong>Complete</strong>, <strong>Skip</strong>, or <strong>Delete</strong>.</p>
+        <table>
+            <thead>
+                <tr>
+                    <th onclick="sortTable('dueDate')">Due Date ⬇️</th>
+                    <th onclick="sortTable('taskName')">Task</th>
+                    <th onclick="sortTable('category')">Category</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="coming-up-list">
+                </tbody>
+        </table>
+
+        ---
+
+        <h2>📝 Task History (All Tasks)</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th onclick="sortTable('lastCompleted')">Last Completed ⬇️</th>
+                    <th onclick="sortTable('taskName')">Task</th>
+                    <th onclick="sortTable('category')">Category</th>
+                    <th>Frequency</th>
+                    <th>Description</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="history-list">
+                </tbody>
+        </table>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>

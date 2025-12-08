@@ -1,0 +1,154 @@
+/* Basic CSS for readability and structure */
+body {
+    font-family: Arial, sans-serif;
+    margin: 20px;
+    background-color: #f4f4f9;
+}
+.container {
+    max-width: 1200px;
+    margin: auto;
+    background: white;
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+h1, h2 {
+    color: #333;
+    text-align: center;
+}
+form {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 15px;
+    margin-bottom: 30px;
+    padding: 20px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    background-color: #e9e9f0;
+}
+form label {
+    font-weight: bold;
+    display: block;
+    margin-bottom: 5px;
+}
+form input, form select, form textarea {
+    width: 90%;
+    padding: 8px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+}
+/* Buttons used in tables */
+button {
+    padding: 5px 10px;
+    background-color: #5cb85c;
+    color: white;
+    border: none;
+    cursor: pointer;
+    border-radius: 4px;
+    font-size: 14px;
+    transition: background-color 0.3s;
+    margin-right: 5px;
+}
+button.delete-button {
+    background-color: #d9534f;
+}
+button.skip-button {
+    background-color: #f0ad4e;
+}
+/* Style for the submit button in the form */
+form button[type="submit"] {
+    grid-column: 1 / -1;
+    padding: 10px 20px;
+    background-color: #5cb85c;
+    color: white;
+    border: none;
+    cursor: pointer;
+    border-radius: 4px;
+    font-size: 16px;
+}
+table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 20px;
+}
+th, td {
+    padding: 12px;
+    text-align: left;
+    border-bottom: 1px solid #ddd;
+}
+th {
+    background-color: #337ab7;
+    color: white;
+    cursor: pointer;
+}
+tr:nth-child(even) {
+    background-color: #f2f2f2;
+}
+/* Status Highlighting */
+.status-due {
+    background-color: #fcf8e3; /* Light Yellow */
+    color: #8a6d3b;
+    font-weight: bold;
+}
+.status-overdue {
+    background-color: #f2dede; /* Light Red */
+    color: #a94442;
+    font-weight: bold;
+    animation: pulse 1s infinite alternate;
+}
+@keyframes pulse {
+    from { opacity: 1; }
+    to { opacity: 0.8; }
+}
+.complete-checkbox {
+    cursor: pointer;
+    width: 20px;
+    height: 20px;
+    vertical-align: middle;
+    margin-right: 5px;
+}
+/* Calendar View Styles */
+#calendar-controls {
+    display: flex;
+    justify-content: center;
+    gap: 20px;
+    margin-bottom: 15px;
+}
+#calendar-view {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 1px;
+    background-color: #ccc;
+    border: 1px solid #ccc;
+}
+.calendar-day {
+    background-color: #fff;
+    padding: 10px;
+    height: 100px;
+    overflow-y: auto;
+    font-size: 0.9em;
+}
+.calendar-header {
+    background-color: #337ab7;
+    color: white;
+    text-align: center;
+    padding: 5px;
+    font-weight: bold;
+}
+.task-event {
+    background-color: #5cb85c;
+    color: white;
+    padding: 2px 4px;
+    margin-bottom: 2px;
+    border-radius: 3px;
+    font-size: 0.8em;
+    cursor: default;
+}
+.task-event.overdue {
+    background-color: #a94442;
+}
+.empty-day {
+    background-color: #eee;
+}
+
+
