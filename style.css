@@ -108,27 +108,29 @@ tr:nth-child(even) {
     margin-right: 5px;
 }
 
-/* Side button container position */
+/* 🏆 CORRECTED SIDE BUTTON STYLING 🏆 */
 #side-buttons {
+    /* Use fixed position relative to the viewport */
     position: fixed;
-    top: 50%;
-    right: -70px; /* Hide slightly off-screen */
-    transform: translateY(-50%) rotate(-90deg);
-    transform-origin: 100% 100%;
+    top: 30%; /* Start lower down the page */
+    right: 20px; /* Position them 20px from the right edge */
     z-index: 1000;
-    display: flex; /* To stack buttons horizontally when rotated */
-    gap: 10px;
-    padding: 10px;
+    display: flex;
+    flex-direction: column; /* Stack buttons vertically */
+    gap: 15px; /* Spacing between buttons */
+    /* Remove rotation and transform properties */
 }
 
 #side-buttons button {
-    padding: 8px 15px;
+    padding: 10px 15px;
     font-size: 14px;
-    border-radius: 4px 4px 0 0;
-    box-shadow: -2px 0 5px rgba(0, 0, 0, 0.2);
+    width: 200px; /* Give them a standard width for readability */
+    border-radius: 4px; /* Standard border radius */
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
     font-weight: bold;
-    text-shadow: 1px 1px 1px rgba(0,0,0,0.3);
-    /* Individual colors for clarity */
+    text-align: center;
+    
+    /* Ensure colors apply correctly */
     background-color: #007bff; 
     color: white;
 }
