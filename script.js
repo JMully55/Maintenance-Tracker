@@ -15,17 +15,22 @@ function formatDate(date) {
     return [year, month, day].join('-');
 }
 
+// Function to format ISO string to readable format (date and time)
+function formatTimestamp(isoString) {
+    const date = new Date(isoString);
+    const datePart = date.toLocaleDateString();
+    const timePart = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    return `${datePart} ${timePart}`;
+}
+
 // Helper to create a date object correctly from YYYY-MM-DD string
 function createLocalDate(dateString) {
     const parts = dateString.split('-').map(p => parseInt(p, 10));
-    // Use local time components to avoid UTC shift
     return new Date(parts[0], parts[1] - 1, parts[2]);
 }
 
 function calculateDueDate(lastCompletedDate, frequencyDays) {
     if (!lastCompletedDate) return null;
-    
-    // Use the custom function to safely create the date object
     const lastDate = createLocalDate(lastCompletedDate);
     const nextDate = new Date(lastDate);
     nextDate.setDate(lastDate.getDate() + parseInt(frequencyDays));
@@ -54,6 +59,19 @@ function loadTasks() {
     const storedData = localStorage.getItem(STORAGE_KEY);
     if (storedData) {
         taskData = JSON.parse(storedData); 
+        // Ensure old tasks that didn't have completionHistory get the array
+        taskData.forEach(task => {
+            if (!task.completionHistory) {
+                task.completionHistory = [];
+                // If lastCompleted exists but history is empty, add the lastCompleted date to history
+                if (task.lastCompleted) {
+                    task.completionHistory.push({
+                        timestamp: new Date(task.lastCompleted).toISOString(),
+                        dateOnly: task.lastCompleted
+                    });
+                }
+            }
+        });
     }
 }
 
@@ -89,6 +107,32 @@ function setupCalendarControls() {
     }
 }
 
+function getRecurringDueDates(task, monthStart, monthEnd) {
+    const events = {};
+    if (!task.lastCompleted) return events;
+
+    const frequency = parseInt(task.frequencyDays);
+    if (isNaN(frequency) || frequency <= 0) return events;
+
+    let currentDate = calculateDueDate(task.lastCompleted, frequency);
+    currentDate.setHours(0, 0, 0, 0); 
+
+    while (currentDate.getTime() <= monthEnd.getTime()) {
+        
+        if (currentDate.getTime() >= monthStart.getTime()) {
+            const dateString = formatDate(currentDate);
+            events[dateString] = {
+                taskName: task.taskName,
+                isOverdue: currentDate.getTime() < getToday(),
+            };
+        }
+
+        currentDate.setDate(currentDate.getDate() + frequency);
+    }
+    return events;
+}
+
+
 window.renderCalendar = function() {
     const calendarView = document.getElementById('calendar-view');
     calendarView.innerHTML = '';
@@ -101,8 +145,29 @@ window.renderCalendar = function() {
     const firstDayOfMonth = new Date(year, month, 1);
     const lastDayOfMonth = new Date(year, month + 1, 0);
     const startingDayOfWeek = firstDayOfMonth.getDay(); 
-    const daysInMonth = lastDayOfMonth.getDate();
-    const today = new Date().setHours(0,0,0,0);
+    
+    const calendarStartDate = new Date(firstDayOfMonth);
+    calendarStartDate.setDate(firstDayOfMonth.getDate() - startingDayOfWeek);
+    calendarStartDate.setHours(0, 0, 0, 0); 
+    
+    const calendarEndDate = new Date(calendarStartDate);
+    calendarEndDate.setDate(calendarStartDate.getDate() + 42); 
+    calendarEndDate.setHours(0, 0, 0, 0); 
+
+    const allEvents = {};
+    taskData.forEach(task => {
+        const eventsForTask = getRecurringDueDates(task, calendarStartDate, calendarEndDate);
+        
+        for (const dateString in eventsForTask) {
+            if (!allEvents[dateString]) {
+                allEvents[dateString] = [];
+            }
+            allEvents[dateString].push(eventsForTask[dateString]);
+        }
+    });
+
+    let currentDate = new Date(calendarStartDate);
+    let daysRendered = 0;
 
     const daysOfWeek = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
@@ -113,48 +178,206 @@ window.renderCalendar = function() {
         calendarView.appendChild(header);
     });
     
-    for (let i = 0; i < startingDayOfWeek; i++) {
-        const emptyDiv = document.createElement('div');
-        emptyDiv.className = 'calendar-day empty-day';
-        calendarView.appendChild(emptyDiv);
-    }
-
-    for (let day = 1; day <= daysInMonth; day++) {
-        const date = new Date(year, month, day);
-        const dateString = formatDate(date);
-        
+    while (daysRendered < 42 && currentDate.getTime() < calendarEndDate.getTime()) {
+        const dateString = formatDate(currentDate);
         const dayDiv = document.createElement('div');
         dayDiv.className = 'calendar-day';
-        dayDiv.innerHTML = `<strong>${day}</strong>`;
 
-        taskData.forEach(task => {
-            const dueDate = calculateDueDate(task.lastCompleted, task.frequencyDays);
-            if (dueDate && formatDate(dueDate) === dateString) {
+        if (currentDate.getMonth() !== month) {
+             dayDiv.classList.add('empty-day');
+        }
+
+        dayDiv.innerHTML = `<strong>${currentDate.getDate()}</strong>`;
+        
+        if (allEvents[dateString]) {
+            allEvents[dateString].forEach(event => {
                 const eventDiv = document.createElement('div');
                 eventDiv.className = 'task-event';
                 
-                if (date.getTime() < today) {
+                if (event.isOverdue) {
                     eventDiv.classList.add('overdue');
                 }
                 
-                eventDiv.textContent = task.taskName;
+                eventDiv.textContent = event.taskName;
                 dayDiv.appendChild(eventDiv);
-            }
-        });
+            });
+        }
         
         calendarView.appendChild(dayDiv);
+        currentDate.setDate(currentDate.getDate() + 1);
+        daysRendered++;
     }
 }
 
-// --- Core Application Logic ---
 
-function renderTables() {
-    const comingUpList = document.getElementById('coming-up-list');
+// --- Modal Functions ---
+
+window.openHistoryModal = function() {
+    document.getElementById('history-modal').style.display = 'block';
+    renderHistoryModal(); 
+}
+
+window.closeHistoryModal = function() {
+    document.getElementById('history-modal').style.display = 'none';
+}
+
+window.openCompletedModal = function() {
+    document.getElementById('completed-modal').style.display = 'block';
+    // Clear search and render initial history
+    document.getElementById('completed-search').value = ''; 
+    renderCompletedModal(); 
+}
+
+window.closeCompletedModal = function() {
+    document.getElementById('completed-modal').style.display = 'none';
+}
+
+window.onclick = function(event) {
+    const modalH = document.getElementById('history-modal');
+    const modalC = document.getElementById('completed-modal');
+    if (event.target === modalH) {
+        closeHistoryModal();
+    }
+    if (event.target === modalC) {
+        closeCompletedModal();
+    }
+}
+
+
+// --- Rendering and Sorting ---
+
+function renderNotepads() {
+    const dailyList = document.getElementById('daily-tasks-list');
+    const weeklyList = document.getElementById('weekly-tasks-list');
+    dailyList.innerHTML = '';
+    weeklyList.innerHTML = '';
+
+    const TODAY = new Date();
+    document.querySelector('.daily-focus h3').textContent = `Today's Tasks (${formatDate(TODAY)})`;
+
+    const TODAY_STR = formatDate(TODAY);
+    const TODAY_TIME = getToday();
+    const WEEK_END_TIME = TODAY_TIME + (7 * 24 * 60 * 60 * 1000);
+
+    // Filter tasks that are due today or this week
+    taskData.forEach(task => {
+        const nextDueDate = calculateDueDate(task.lastCompleted, task.frequencyDays);
+        if (!nextDueDate) return;
+
+        const dueTime = nextDueDate.setHours(0, 0, 0, 0);
+        // Check if the task's LAST completion date matches today's date (it was completed today)
+        const isCompletedToday = (task.lastCompleted === TODAY_STR);
+        const isOverdue = dueTime < TODAY_TIME;
+        
+        const statusClass = isOverdue ? 'status-overdue' : '';
+        const taskStatusClass = isCompletedToday ? 'completed-task-note' : statusClass;
+
+        // Generate the list item HTML for both notepads
+        const listItemHTML = `
+            <li class="${taskStatusClass}">
+                <span 
+                    class="notepad-checkbox" 
+                    data-id="${task.id}" 
+                    title="Mark Complete"
+                >
+                    ${isCompletedToday ? '✔️' : (isOverdue ? '❌' : '◻️')}
+                </span>
+                ${task.taskName} (${task.category})
+            </li>
+        `;
+        
+        // 1. DAILY TASKS
+        if (formatDate(nextDueDate) === TODAY_STR) {
+            dailyList.innerHTML += listItemHTML;
+        }
+
+        // 2. WEEKLY TASKS (Due today or within the next 7 days)
+        if (dueTime >= TODAY_TIME && dueTime < WEEK_END_TIME) {
+            weeklyList.innerHTML += listItemHTML;
+        }
+    });
+
+    if (!dailyList.innerHTML) {
+        dailyList.innerHTML = '<li>🎉 No tasks due today!</li>';
+    }
+    if (!weeklyList.innerHTML) {
+        weeklyList.innerHTML = '<li>😌 No tasks due this week!</li>';
+    }
+}
+
+
+function renderHistoryModal() {
     const historyList = document.getElementById('history-list');
-    
-    comingUpList.innerHTML = ''; 
     historyList.innerHTML = '';
+    
+    taskData.forEach((task, index) => {
+        task.id = taskData.indexOf(task); 
 
+        const historyRow = document.createElement('tr');
+        historyRow.innerHTML = `
+            <td>${task.lastCompleted || 'N/A'}</td>
+            <td>${task.taskName}</td>
+            <td>${task.category}</td>
+            <td>${task.frequencyDays} days</td>
+            <td>${task.description}</td>
+            <td><button class="delete-button-history" data-id="${task.id}" title="Delete Task">Delete</button></td>
+        `;
+        historyList.appendChild(historyRow);
+    });
+}
+
+function renderCompletedModal() {
+    const completedListBody = document.getElementById('completed-list');
+    completedListBody.innerHTML = '';
+    const searchFilter = document.getElementById('completed-search').value.toLowerCase();
+
+    // Flatten the completion history from all tasks into a single array
+    let allCompletedEvents = [];
+    taskData.forEach(task => {
+        task.completionHistory.forEach(historyItem => {
+            // Check if the task name or category contains the search term
+            if (task.taskName.toLowerCase().includes(searchFilter) || 
+                task.category.toLowerCase().includes(searchFilter)) {
+                
+                allCompletedEvents.push({
+                    name: task.taskName,
+                    category: task.category,
+                    timestamp: historyItem.timestamp
+                });
+            }
+        });
+    });
+
+    // Sort by timestamp (most recent first)
+    allCompletedEvents.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+    if (allCompletedEvents.length === 0 && searchFilter) {
+        completedListBody.innerHTML = `<tr><td colspan="3">No completed tasks match your search: "${searchFilter}"</td></tr>`;
+        return;
+    }
+    if (allCompletedEvents.length === 0) {
+        completedListBody.innerHTML = `<tr><td colspan="3">No tasks have been completed yet.</td></tr>`;
+        return;
+    }
+
+
+    allCompletedEvents.forEach(event => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td>${formatTimestamp(event.timestamp)}</td>
+            <td>${event.name}</td>
+            <td>${event.category}</td>
+        `;
+        completedListBody.appendChild(row);
+    });
+}
+
+
+function renderDashboard() { 
+    const comingUpList = document.getElementById('coming-up-list');
+    comingUpList.innerHTML = ''; 
+
+    // Filter and render Coming Up List
     taskData.forEach((task, index) => {
         const dueDate = calculateDueDate(task.lastCompleted, task.frequencyDays);
         const status = getStatus(dueDate);
@@ -168,7 +391,7 @@ function renderTables() {
         // --- 1. Coming Up Table ---
         if (status.sortValue <= 30) {
             const row = document.createElement('tr');
-            row.className = task.statusClass;
+            row.className = status.class;
             row.innerHTML = `
                 <td>${dueDate ? formatDate(dueDate) : 'N/A'}</td>
                 <td>${task.taskName}</td>
@@ -182,27 +405,16 @@ function renderTables() {
             `;
             comingUpList.appendChild(row);
         } 
-        
-        // --- 2. History Table ---
-        const historyRow = document.createElement('tr');
-        historyRow.innerHTML = `
-            <td>${task.lastCompleted || 'N/A'}</td>
-            <td>${task.taskName}</td>
-            <td>${task.category}</td>
-            <td>${task.frequencyDays} days</td>
-            <td>${task.description}</td>
-            <td><button class="delete-button-history" data-id="${task.id}" title="Delete Task">Delete</button></td>
-        `;
-        historyList.appendChild(historyRow);
     });
     
     renderCalendar();
+    renderNotepads(); 
     saveTasks();
 }
 
 let sortDirection = {}; 
 
-window.sortTable = function(key) {
+window.sortTable = function(key, isModal = false) {
     let direction = sortDirection[key] === 'asc' ? 'desc' : 'asc';
     sortDirection[key] = direction;
 
@@ -222,24 +434,51 @@ window.sortTable = function(key) {
         return 0;
     });
     
-    renderTables(); 
+    if (isModal) {
+        renderHistoryModal();
+    } else {
+        renderDashboard(); 
+    }
 }
 
 // --- Task Action Listeners ---
 
 document.getElementById('coming-up-list').addEventListener('click', handleTaskAction);
-document.getElementById('history-list').addEventListener('click', handleTaskAction);
+document.getElementById('history-modal').addEventListener('click', handleTaskAction); 
+document.getElementById('focus-notepads').addEventListener('click', handleTaskAction); 
 
 function handleTaskAction(event) {
     let target = event.target;
-    const taskId = parseInt(target.getAttribute('data-id'));
-    const task = taskData[taskId];
+    while (target && !target.hasAttribute('data-id') && target.id !== 'focus-notepads') {
+        target = target.parentElement;
+    }
+    if (!target || target.id === 'focus-notepads') return;
 
-    if (target.classList.contains('complete-checkbox')) {
+    const taskId = parseInt(target.getAttribute('data-id'));
+    const task = taskData.find(t => t.id === taskId);
+    
+    const isCompleteAction = target.classList.contains('complete-checkbox') || target.classList.contains('notepad-checkbox');
+
+    if (isCompleteAction) {
         if (task) {
-            task.lastCompleted = formatDate(new Date());
-            target.closest('td').innerHTML = '✅ Done!'; 
-            renderTables(); 
+            const nowISO = new Date().toISOString();
+            const nowFormatted = formatDate(new Date()); 
+
+            // Record completion with full timestamp
+            task.completionHistory.push({
+                timestamp: nowISO,
+                dateOnly: nowFormatted
+            });
+            
+            task.lastCompleted = nowFormatted;
+            
+            renderDashboard(); 
+            if(document.getElementById('history-modal').style.display === 'block') {
+                 renderHistoryModal();
+            }
+            if(document.getElementById('completed-modal').style.display === 'block') {
+                 renderCompletedModal();
+            }
         }
     } else if (target.classList.contains('skip-button')) {
         if (task) {
@@ -249,19 +488,30 @@ function handleTaskAction(event) {
             
             task.lastCompleted = formatDate(currentDueDate);
             
-            renderTables(); 
+            renderDashboard(); 
+            if(document.getElementById('history-modal').style.display === 'block') {
+                 renderHistoryModal();
+            }
             alert(`Task "${task.taskName}" skipped. New due date is ${formatDate(newDueDate)}.`);
         }
     } else if (target.classList.contains('delete-button') || target.classList.contains('delete-button-history')) {
         if (task && confirm(`Are you sure you want to permanently delete task "${task.taskName}"? This cannot be undone.`)) {
-            taskData.splice(taskId, 1);
-            renderTables(); 
+            const indexToDelete = taskData.findIndex(t => t.id === taskId);
+            if (indexToDelete > -1) {
+                taskData.splice(indexToDelete, 1);
+            }
+            taskData.forEach((t, i) => t.id = i); 
+            
+            renderDashboard(); 
+            if(document.getElementById('history-modal').style.display === 'block') {
+                 renderHistoryModal();
+            }
         }
     }
 }
 
 
-// --- Form Submission (CRITICAL SECTION WITH DATE FIX) ---
+// --- Form Submission ---
 
 function registerFormListener() {
     document.getElementById('task-form').addEventListener('submit', function(event) {
@@ -278,21 +528,25 @@ function registerFormListener() {
 
         if (!lastCompletedDate) {
             if (targetDueDate) {
-                // CORRECTED LOGIC: Use createLocalDate to ensure the date is handled locally.
                 const targetDate = createLocalDate(targetDueDate);
                 const initialLastCompleted = new Date(targetDate);
-                
-                // Subtract the frequency in days from the target date
                 initialLastCompleted.setDate(targetDate.getDate() - frequency);
-                
                 lastCompletedDate = formatDate(initialLastCompleted);
             } else {
-                // Default: Due in 7 days from today
                 const today = new Date();
                 const initialLastCompleted = new Date(today);
                 initialLastCompleted.setDate(today.getDate() + 7 - frequency);
                 lastCompletedDate = formatDate(initialLastCompleted);
             }
+        }
+        
+        // Prepare initial completion history array
+        const initialHistory = [];
+        if (lastCompletedDate) {
+             initialHistory.push({
+                timestamp: new Date(lastCompletedDate).toISOString(),
+                dateOnly: lastCompletedDate
+            });
         }
 
         const newTask = {
@@ -301,6 +555,8 @@ function registerFormListener() {
             description: document.getElementById('description').value,
             frequencyDays: frequency,
             lastCompleted: lastCompletedDate, 
+            completionHistory: initialHistory, 
+            id: taskData.length 
         };
         
         taskData.push(newTask);
@@ -314,9 +570,8 @@ function registerFormListener() {
 
 function initTracker() {
     loadTasks();
+    taskData.forEach((t, i) => t.id = i);
     setupCalendarControls();
     registerFormListener();
     sortTable('dueDate');
 }
-
-
