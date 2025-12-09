@@ -108,18 +108,16 @@ tr:nth-child(even) {
     margin-right: 5px;
 }
 
-/* 🏆 CORRECTED CONTROL BUTTON STYLING AND POSITIONING 🏆 */
+/* Control Button Positioning (Side-by-side) */
 #control-buttons {
-    /* Use Flexbox to align buttons horizontally */
     display: flex;
-    justify-content: center; /* Center the group of buttons */
-    gap: 20px; /* Space between the buttons */
-    margin: 20px 0 30px; /* Space above and below the button group */
+    justify-content: center;
+    gap: 20px;
+    margin: 20px 0 30px;
     padding: 10px;
 }
 
 #control-buttons button {
-    /* Button appearance for inline placement */
     padding: 10px 20px;
     font-size: 16px; 
     width: 250px; 
@@ -135,7 +133,7 @@ tr:nth-child(even) {
 }
 
 
-/* NEW: Notepad Styles */
+/* Notepad Styles */
 #focus-notepads {
     display: flex;
     justify-content: space-around;
@@ -200,7 +198,7 @@ tr:nth-child(even) {
 }
 
 
-/* Calendar View Styles (no change) */
+/* Calendar View Styles */
 #calendar-controls {
     display: flex;
     justify-content: center;
