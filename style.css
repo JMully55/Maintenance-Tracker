@@ -111,23 +111,40 @@ form button[type="submit"] {
     box-shadow: 0 2px 5px rgba(0,0,0,0.2);
 }
 
-/* Focus Notepads (Sticky Notes) */
-#focus-notepads {
+/* Focus Notepads Layout Adjustments */
+#focus-notepads-row1 {
     display: flex;
     justify-content: space-around;
     gap: 20px;
+    margin-bottom: 20px;
+}
+#focus-notepads-row2 {
+    display: flex;
+    justify-content: center; /* Center the single note in the second row */
     margin-bottom: 30px;
 }
 .notepad {
-    flex: 1;
     min-height: 180px;
     padding: 15px;
     border-radius: 5px;
     box-shadow: 2px 2px 8px rgba(0, 0, 0, 0.15);
     font-family: 'Georgia', serif;
 }
+#focus-notepads-row2 .notepad {
+    flex: 0 1 50%; /* Make the completed note span half the width and center it */
+}
+
+
+/* Focus Notepads (Sticky Notes) */
 .daily-focus { background-color: #fffd8b; transform: rotate(-1deg); }
 .weekly-focus { background-color: #b3e5fc; transform: rotate(1deg); }
+
+/* NEW Completed Note Style (Green) */
+.completed-daily-focus {
+    background-color: #d6f2c2; /* Very Light Green */
+    transform: none; /* No rotation */
+    border: 1px solid #5cb85c;
+}
 .notepad h3 { margin-top: 0; border-bottom: 1px solid rgba(0,0,0,0.1); }
 .notepad ul { list-style: none; padding: 0; }
 .notepad li { padding: 5px 0; display: flex; align-items: center; border-bottom: 1px dotted rgba(0,0,0,0.05); }
@@ -205,14 +222,14 @@ th {
 }
 tr:nth-child(even) { background-color: #fcfcfc; }
 
-/* 📅 CALENDAR FIX 📅 */
+/* Calendar Grid */
 #calendar-view {
     display: grid;
     grid-template-columns: repeat(7, 1fr);
     gap: 1px;
     background-color: #ddd;
     border: 1px solid #ccc;
-    min-height: 300px; /* Ensure space is reserved */
+    min-height: 300px;
 }
 .calendar-day { background-color: #fff; padding: 8px; min-height: 90px; }
 .calendar-header { background-color: #ffb84d; color: #4a4a4a; text-align: center; padding: 5px; font-weight: bold; }
