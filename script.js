@@ -100,8 +100,8 @@ function renderCompletedModal() {
 
 // --- Dashboard ---
 function renderNotepads() {
-    const dl = document.getElementById('daily-tasks-list'), wl = document.getElementById('weekly-tasks-list');
-    dl.innerHTML = ''; wl.innerHTML = '';
+    const dl = document.getElementById('daily-tasks-list'), wl = document.getElementById('weekly-tasks-list'), cl = document.getElementById('completed-tasks-list');
+    dl.innerHTML = ''; wl.innerHTML = ''; cl.innerHTML = '';
     const now = new Date(); document.querySelector('.daily-focus h3').textContent = `Today's Tasks (${formatDate(now)})`;
     const todayS = formatDate(now), start = new Date(now), end = new Date(start); 
     start.setDate(now.getDate() - now.getDay()); start.setHours(0,0,0,0); 
@@ -110,9 +110,7 @@ function renderNotepads() {
     let dailyTasksCount = 0;
     let dailyTasksCompletedCount = 0;
     let weeklyTasksCount = 0;
-    let weeklyTasksCompletedCount = 0;
-
-
+    
     taskData.forEach((t, i) => {
         const due = calculateDueDate(t.lastCompleted, t.frequencyDays, t.isOneTime);
         if (!due || (t.isOneTime && t.frequencyDays === 0)) return;
@@ -120,34 +118,44 @@ function renderNotepads() {
         
         const isCompletedToday = t.lastCompleted === todayS;
         
-        const item = `<li><span class="notepad-checkbox" onclick="${isCompletedToday ? `markUndone(${i})` : `markDone(${i})`}">${isCompletedToday?'✔️':'◻️'}</span>${t.taskName}</li>`;
-        
-        if (ds === todayS) {
+        // Items for Today's List (Uncompleted)
+        if (ds === todayS && !isCompletedToday) {
             dailyTasksCount++;
-            if (isCompletedToday) dailyTasksCompletedCount++;
+            const item = `<li><span class="notepad-checkbox" onclick="markDone(${i})">◻️</span>${t.taskName}</li>`;
             dl.innerHTML += item;
-        }
+        } 
         
+        // Items for Completed List (Completed Today)
+        if (isCompletedToday) {
+            dailyTasksCompletedCount++;
+            const item = `<li><span class="notepad-checkbox" onclick="markUndone(${i})">✔️</span>${t.taskName}</li>`;
+            cl.innerHTML += item;
+        }
+
+        // Items for Weekly List
         if (due >= start && due <= end) {
-            weeklyTasksCount++;
-            if (isCompletedToday) weeklyTasksCompletedCount++;
-            wl.innerHTML += item;
+             weeklyTasksCount++;
+             // Use the same completed check as above (if completed today, show check)
+             const item = `<li><span class="notepad-checkbox">${isCompletedToday?'✔️':'◻️'}</span>${t.taskName} (${ds})</li>`;
+             wl.innerHTML += item;
         }
     });
 
-    // 🏆 NEW MESSAGE LOGIC 🏆
-    if (dailyTasksCount === 0) {
+    // 🏆 FINAL MESSAGE LOGIC 🏆
+    if (dailyTasksCount === 0 && dailyTasksCompletedCount === 0) {
         dl.innerHTML = '<li>🎉 Nothing scheduled for today!</li>';
-    } else if (dailyTasksCount > 0 && dailyTasksCount === dailyTasksCompletedCount) {
-        dl.innerHTML = '<li>✅ Daily Goal Reached! Everything completed.</li>';
-    } else if (dailyTasksCount > 0 && dailyTasksCompletedCount > 0) {
-        // Display partially completed tasks list
+    } else if (dailyTasksCount === 0 && dailyTasksCompletedCount > 0) {
+         // If there are completed tasks, the "Today's Tasks" list is empty by design
+         // This space remains blank or shows a quiet message.
+         dl.innerHTML = '<li>✅ Today\'s tasks moved to Completed List.</li>';
+    }
+
+    if (cl.innerHTML === '') {
+        cl.innerHTML = '<li>No tasks completed yet.</li>';
     }
 
     if (weeklyTasksCount === 0) {
         wl.innerHTML = '<li>😌 Nothing scheduled for this week!</li>';
-    } else if (weeklyTasksCount > 0 && weeklyTasksCount === weeklyTasksCompletedCount) {
-        wl.innerHTML = '<li>🏆 Weekly Goal Reached! All current tasks complete.</li>';
     }
 }
 
