@@ -184,7 +184,8 @@ window.openCompletedModal = () => {
     const modal = document.getElementById('completed-modal');
     if (modal) {
         modal.style.display = 'block'; 
-        document.getElementById('completed-search').value = ''; 
+        const searchInput = document.getElementById('completed-search');
+        if (searchInput) searchInput.value = ''; 
         renderCompletedModal();
     }
 };
@@ -213,7 +214,7 @@ function renderHistoryModal() {
 function renderCompletedModal() {
     const list = document.getElementById('completed-list'); if (!list) return;
     list.innerHTML = '';
-    const q = document.getElementById('completed-search').value.toLowerCase();
+    const q = document.getElementById('completed-search')?.value.toLowerCase() || '';
     let history = [];
     taskData.forEach(t => t.completionHistory.forEach(h => {
         if (t.taskName.toLowerCase().includes(q) || t.category.toLowerCase().includes(q)) history.push({ name: t.taskName, cat: t.category, time: h.timestamp });
@@ -230,8 +231,7 @@ function renderNotepads() {
     
     dl.innerHTML = ''; wl.innerHTML = ''; cl.innerHTML = '';
     const now = new Date(); 
-    // Ensure the h3 element exists before setting text
-    const dailyH3 = document.querySelector('#focus-notepads-row1 .daily-focus h3');
+    const dailyH3 = document.querySelector('.daily-focus h3');
     if (dailyH3) dailyH3.textContent = `Today's Tasks (${formatDate(now)})`;
     
     const todayS = formatDate(now), start = new Date(now), end = new Date(start); 
@@ -249,7 +249,8 @@ function renderNotepads() {
         
         const isCompletedToday = t.lastCompleted === todayS;
         
-        const itemTemplate = (action, symbol) => `<li><span class="notepad-checkbox" onclick="${action}">${symbol}</span>${t.taskName}</li>`;
+        // Use task index (i) for action buttons directly related to the taskData array index
+        const itemTemplate = (action, symbol) => `<li><span class="notepad-checkbox" onclick="${action}(${i})">${symbol}</span>${t.taskName}</li>`;
 
         // 1. Check if due TODAY
         if (ds === todayS) {
@@ -257,10 +258,10 @@ function renderNotepads() {
             if (isCompletedToday) {
                 // Task is due today AND completed today -> Move to Completed List
                 dailyTasksCompletedCount++;
-                cl.innerHTML += itemTemplate(`markUndone(${i})`, '✔️');
+                cl.innerHTML += itemTemplate(`markUndone`, '✔️');
             } else {
                 // Task is due today AND UNCOMPLETED -> Show in Today's List
-                dl.innerHTML += itemTemplate(`markDone(${i})`, '◻️');
+                dl.innerHTML += itemTemplate(`markDone`, '◻️');
             }
         }
         
