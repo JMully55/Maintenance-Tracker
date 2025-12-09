@@ -167,7 +167,7 @@ window.renderCalendar = function() {
     }
 };
 
-// --- Modal Functions ---
+// --- Modal Functions (Working) ---
 window.openHistoryModal = () => { 
     const modal = document.getElementById('history-modal');
     if (modal) {
@@ -227,7 +227,7 @@ function renderCompletedModal() {
 // --- Dashboard ---
 function renderNotepads() {
     const dl = document.getElementById('daily-tasks-list'), wl = document.getElementById('weekly-tasks-list'), cl = document.getElementById('completed-tasks-list');
-    if (!dl || !wl || !cl) return; 
+    if (!dl || !wl || !cl) return; // Guard against missing notepad elements
     
     dl.innerHTML = ''; wl.innerHTML = ''; cl.innerHTML = '';
     const now = new Date(); 
@@ -269,6 +269,7 @@ function renderNotepads() {
         // 2. Items for Weekly List
         if (due >= start && due <= end) {
              weeklyTasksCount++;
+             // Use the same completed check as above (if completed today, show check)
              const item = `<li><span class="notepad-checkbox">${isCompletedToday?'✔️':'◻️'}</span>${t.taskName} (${ds})</li>`;
              wl.innerHTML += item;
         }
@@ -300,7 +301,7 @@ function renderDashboard() {
         const status = getStatus(due);
         if (status.sortValue <= 30) {
             const row = document.createElement('tr'); row.className = status.class;
-            // Use t.id for actions instead of array index i
+            // CRITICAL FIX: Use t.id for actions instead of array index i
             row.innerHTML = `<td>${formatDate(due)}</td><td>${t.taskName}</td><td>${t.category}</td><td>${status.text}</td>
             <td><button onclick="markDone(${t.id})">Done</button> ${t.isOneTime?'':`<button class="skip-button" onclick="skipTask(${t.id})">Skip</button>`} <button class="delete-button" onclick="deleteTask(${t.id})">Delete</button></td>`;
             list.appendChild(row);
@@ -458,3 +459,6 @@ function registerFormListener() {
         toggleCustomFrequency();
     };
 }
+
+
+
