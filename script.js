@@ -65,10 +65,107 @@ function loadTasks() {
 }
 function saveTasks() { localStorage.setItem(STORAGE_KEY, JSON.stringify(taskData)); }
 
-// --- Calendar Logic (omitted for brevity) ---
-function setupCalendarControls() { /* ... */ }
-function getRecurringDueDates(task, mStart, mEnd) { /* ... */ }
-window.renderCalendar = function() { /* ... */ };
+// --- Calendar Logic ---
+function setupCalendarControls() {
+    const ms = document.getElementById('month-select'), ys = document.getElementById('year-select');
+    const now = new Date();
+    const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+    ms.innerHTML = months.map((m, i) => `<option value="${i}" ${i===now.getMonth()?'selected':''}>${m}</option>`).join('');
+    for (let y = now.getFullYear() - 2; y <= now.getFullYear() + 5; y++) {
+        const op = document.createElement('option'); op.value = y; op.text = y;
+        if (y === now.getFullYear()) op.selected = true;
+        ys.appendChild(op);
+    }
+}
+
+function getRecurringDueDates(task, mStart, mEnd) {
+    const events = {};
+    if (task.isOneTime && task.frequencyDays === 0) return events;
+    if (!task.lastCompleted) return events;
+    
+    const frequency = parseInt(task.frequencyDays);
+    if (isNaN(frequency) || frequency <= 0) {
+        if(task.isOneTime && frequency === 1) {
+            const nextDueDate = calculateDueDate(task.lastCompleted, 1, true);
+            if (nextDueDate >= mStart && nextDueDate <= mEnd) {
+                 events[formatDate(nextDueDate)] = { name: `${task.taskName} (1-Time)`, overdue: nextDueDate.getTime() < getToday() };
+            }
+            return events;
+        }
+        return events;
+    }
+
+    let currentDate = calculateDueDate(task.lastCompleted, frequency, task.isOneTime);
+    
+    if (!currentDate) return events;
+    currentDate.setHours(0, 0, 0, 0); 
+    
+    if (currentDate.getTime() < mStart.getTime() && !task.isOneTime) {
+        const daysDiff = Math.ceil((mStart.getTime() - currentDate.getTime()) / 86400000);
+        const cyclesToSkip = Math.ceil(daysDiff / frequency);
+        currentDate.setDate(currentDate.getDate() + cyclesToSkip * frequency);
+    }
+    
+    while (currentDate.getTime() <= mEnd.getTime()) {
+        
+        if (currentDate.getTime() >= mStart.getTime()) {
+            const dateString = formatDate(currentDate);
+            events[dateString] = { 
+                name: task.taskName + (task.isOneTime ? ' (1-Time)':''), 
+                overdue: currentDate.getTime() < getToday() 
+            };
+        }
+
+        if (task.isOneTime) break;
+        
+        currentDate.setDate(currentDate.getDate() + frequency);
+    }
+    return events;
+}
+
+
+window.renderCalendar = function() {
+    const view = document.getElementById('calendar-view');
+    if (!view) return; // Guard clause for calendar element
+    
+    view.innerHTML = '';
+    const m = parseInt(document.getElementById('month-select').value);
+    const y = parseInt(document.getElementById('year-select').value);
+    const start = new Date(y, m, 1);
+    
+    start.setDate(start.getDate() - start.getDay());
+    start.setHours(0, 0, 0, 0); 
+
+    const end = new Date(start); end.setDate(end.getDate() + 42);
+    end.setHours(0, 0, 0, 0); 
+
+    const allEvents = {};
+    taskData.forEach(t => {
+        const evs = getRecurringDueDates(t, start, end);
+        for (let d in evs) { if (!allEvents[d]) allEvents[d] = []; allEvents[d].push(evs[d]); }
+    });
+
+    ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].forEach(d => {
+        const h = document.createElement('div'); h.className='calendar-header'; h.innerText=d; view.appendChild(h);
+    });
+
+    let curr = new Date(start);
+    for (let i=0; i<42; i++) {
+        const ds = formatDate(curr);
+        const dDiv = document.createElement('div'); 
+        dDiv.className='calendar-day' + (curr.getMonth()!==m?' empty-day':'');
+        dDiv.innerHTML = `<strong>${curr.getDate()}</strong>`;
+        
+        if (allEvents[ds]) {
+            allEvents[ds].forEach(e => {
+                const eDiv = document.createElement('div'); eDiv.className='task-event' + (e.overdue?' overdue':'');
+                eDiv.innerText = e.name; dDiv.appendChild(eDiv);
+            });
+        }
+        view.appendChild(dDiv);
+        curr.setDate(curr.getDate()+1);
+    }
+};
 
 // --- Modal Functions (FIXED) ---
 window.openHistoryModal = () => { 
@@ -104,7 +201,8 @@ window.onclick = (event) => {
 };
 
 function renderHistoryModal() {
-    const list = document.getElementById('history-list'); list.innerHTML = '';
+    const list = document.getElementById('history-list'); if (!list) return;
+    list.innerHTML = '';
     taskData.forEach((t, i) => {
         if (t.isOneTime && t.frequencyDays === 0) return;
         const row = document.createElement('tr');
@@ -113,7 +211,8 @@ function renderHistoryModal() {
     });
 }
 function renderCompletedModal() {
-    const list = document.getElementById('completed-list'); list.innerHTML = '';
+    const list = document.getElementById('completed-list'); if (!list) return;
+    list.innerHTML = '';
     const q = document.getElementById('completed-search').value.toLowerCase();
     let history = [];
     taskData.forEach(t => t.completionHistory.forEach(h => {
@@ -127,8 +226,10 @@ function renderCompletedModal() {
 // --- Dashboard ---
 function renderNotepads() {
     const dl = document.getElementById('daily-tasks-list'), wl = document.getElementById('weekly-tasks-list'), cl = document.getElementById('completed-tasks-list');
+    if (!dl || !wl || !cl) return; // Guard against missing notepad elements
+    
     dl.innerHTML = ''; wl.innerHTML = ''; cl.innerHTML = '';
-    const now = new Date(); document.querySelector('.daily-focus h3').textContent = `Today's Tasks (${formatDate(now)})`;
+    const now = new Date(); document.querySelector('h3').textContent = `Today's Tasks (${formatDate(now)})`;
     const todayS = formatDate(now), start = new Date(now), end = new Date(start); 
     start.setDate(now.getDate() - now.getDay()); start.setHours(0,0,0,0); 
     end.setDate(start.getDate() + 6); end.setHours(23,59,59,999);
@@ -144,23 +245,22 @@ function renderNotepads() {
         
         const isCompletedToday = t.lastCompleted === todayS;
         
-        // 🏆 TASK MOVEMENT FIX 🏆
-        
+        const itemTemplate = (action, symbol) => `<li><span class="notepad-checkbox" onclick="${action}">${symbol}</span>${t.taskName}</li>`;
+
+        // 1. Due TODAY
         if (ds === todayS) {
             dailyTasksCount++;
             if (isCompletedToday) {
                 // Task is due today AND completed today -> Move to Completed List
                 dailyTasksCompletedCount++;
-                const item = `<li><span class="notepad-checkbox" onclick="markUndone(${i})">✔️</span>${t.taskName}</li>`;
-                cl.innerHTML += item;
+                cl.innerHTML += itemTemplate(`markUndone(${i})`, '✔️');
             } else {
                 // Task is due today AND UNCOMPLETED -> Show in Today's List
-                const item = `<li><span class="notepad-checkbox" onclick="markDone(${i})">◻️</span>${t.taskName}</li>`;
-                dl.innerHTML += item;
+                dl.innerHTML += itemTemplate(`markDone(${i})`, '◻️');
             }
         }
         
-        // Items for Weekly List
+        // 2. Items for Weekly List
         if (due >= start && due <= end) {
              weeklyTasksCount++;
              const item = `<li><span class="notepad-checkbox">${isCompletedToday?'✔️':'◻️'}</span>${t.taskName} (${ds})</li>`;
@@ -172,7 +272,6 @@ function renderNotepads() {
     if (dailyTasksCount === 0 && dailyTasksCompletedCount === 0) {
         dl.innerHTML = '<li>🎉 Nothing scheduled for today!</li>';
     } else if (dailyTasksCount === 0 && dailyTasksCompletedCount > 0) {
-         // This means all due-today tasks were moved to the completed list.
          dl.innerHTML = '<li>✅ All scheduled tasks are done!</li>';
     }
 
@@ -186,7 +285,8 @@ function renderNotepads() {
 }
 
 function renderDashboard() {
-    const list = document.getElementById('coming-up-list'); list.innerHTML = '';
+    const list = document.getElementById('coming-up-list'); if (!list) return;
+    list.innerHTML = '';
     taskData.forEach((t, i) => {
         const due = calculateDueDate(t.lastCompleted, t.frequencyDays, t.isOneTime);
         if (t.isOneTime && t.frequencyDays === 0) return;
@@ -261,19 +361,24 @@ window.sortTable = (key, modal=false) => {
 };
 
 window.toggleCustomFrequency = () => {
-    document.getElementById('customFrequencyDiv').style.display = document.getElementById('frequencySelect').value === 'custom' ? 'block' : 'none';
+    const customDiv = document.getElementById('customFrequencyDiv');
+    if (customDiv) {
+        customDiv.style.display = document.getElementById('frequencySelect').value === 'custom' ? 'block' : 'none';
+    }
 };
 
 window.toggleFormVisibility = function() {
     const formContainer = document.getElementById('task-form-container');
     const button = document.querySelector('#add-task-toggle button');
     
-    if (formContainer.style.display === 'none' || formContainer.style.display === '') {
-        formContainer.style.display = 'block';
-        button.textContent = '— Hide Task Input';
-    } else {
-        formContainer.style.display = 'none';
-        button.textContent = '+ Add New Task / Event';
+    if (formContainer && button) {
+        if (formContainer.style.display === 'none' || formContainer.style.display === '') {
+            formContainer.style.display = 'block';
+            button.textContent = '— Hide Task Input';
+        } else {
+            formContainer.style.display = 'none';
+            button.textContent = '+ Add New Task / Event';
+        }
     }
 }
 
