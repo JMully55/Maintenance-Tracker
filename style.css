@@ -111,7 +111,6 @@ form button[type="submit"] {
     box-shadow: 0 2px 5px rgba(0,0,0,0.2);
 }
 
-
 /* Focus Notepads (Sticky Notes) */
 #focus-notepads {
     display: flex;
@@ -160,6 +159,39 @@ form button[type="submit"] {
     background-color: #5cb85c !important; 
     border: 2px solid #4cae4c;
 }
+
+/* Toggle Button for Form */
+#task-form-container {
+    /* Hidden by default */
+    display: none;
+    padding-top: 15px; 
+    padding-bottom: 5px;
+    margin-bottom: 20px;
+}
+
+#add-task-toggle {
+    text-align: center;
+    margin-bottom: 25px;
+}
+
+#add-task-toggle button {
+    font-family: 'Comic Sans MS', cursive, sans-serif;
+    font-size: 1.2em;
+    padding: 12px 30px;
+    background-color: #d0e8ff; 
+    color: #4d94ff; 
+    border: 2px solid #4d94ff;
+    border-radius: 8px;
+    cursor: pointer;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    transition: all 0.2s;
+}
+
+#add-task-toggle button:hover {
+    background-color: #4d94ff;
+    color: white;
+}
+
 
 /* Table Styling */
 table {
