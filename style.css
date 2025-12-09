@@ -12,13 +12,10 @@ body {
     margin: 50px auto; 
     padding: 40px; 
     
-    /* Simulate Lined Paper Background: White paper, Blue lines, Blue margin */
+    /* Simulate Lined Paper Background */
     background: 
-        /* Horizontal blue lines */
         linear-gradient(to bottom, transparent 39px, #75aadb 40px) 0 0 / 100% 40px,
-        /* Vertical blue margin line */
         linear-gradient(to right, #a0d0ff 1px, transparent 1px) 80px 0 / 1px 100%,
-        /* Base paper color */
         #ffffff;
 
     background-attachment: local; 
@@ -27,11 +24,11 @@ body {
     border-radius: 4px;
     box-shadow: 5px 5px 15px rgba(0,0,0,0.3);
     
-    /* Padding adjustments for the margin line and flow */
     padding-left: 95px; 
     padding-top: 50px;
     padding-right: 40px;
     position: relative; 
+    z-index: 5; /* Ensure container is above other elements if positioned */
 }
 
 h1 {
@@ -70,15 +67,9 @@ h2 {
 }
 
 /* Top Left Tack */
-.container:before {
-    top: -9px; 
-    left: -9px;
-}
+.container:before { top: -9px; left: -9px; }
 /* Top Right Tack */
-.container:after {
-    top: -9px;
-    right: -9px;
-}
+.container:after { top: -9px; right: -9px; }
 
 
 /* Form Styling */
@@ -91,10 +82,7 @@ form {
     gap: 10px;
     margin-bottom: 20px;
 }
-form label {
-    font-weight: bold;
-    color: #333;
-}
+form label { font-weight: bold; color: #333; }
 form input, form select, form textarea {
     width: 95%;
     padding: 6px;
@@ -135,84 +123,32 @@ form button[type="submit"] {
 .completed-task-note { text-decoration: line-through; color: #777; }
 
 
-/* Control Button Positioning (Side-by-side) */
+/* Control Button Positioning */
 #control-buttons {
-    display: flex;
-    justify-content: center;
-    gap: 20px;
-    margin: 20px 0 30px;
-    padding: 10px;
+    display: flex; justify-content: center; gap: 20px; margin: 20px 0 30px; padding: 10px;
 }
-
 #control-buttons button {
-    padding: 10px 20px;
-    font-size: 16px; 
-    width: 250px; 
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-    background-color: #4d94ff; 
-    color: white;
-    font-weight: bold;
-    border: 2px solid #3d7ddf;
+    padding: 10px 20px; font-size: 16px; width: 250px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); background-color: #4d94ff; color: white; font-weight: bold; border: 2px solid #3d7ddf;
 }
-
-#open-completed-modal {
-    background-color: #5cb85c !important; 
-    border: 2px solid #4cae4c;
-}
+#open-completed-modal { background-color: #5cb85c !important; border: 2px solid #4cae4c; }
 
 /* Toggle Button for Form */
-#task-form-container {
-    /* Hidden by default */
-    display: none;
-    padding-top: 15px; 
-    padding-bottom: 5px;
-    margin-bottom: 20px;
-}
-
-#add-task-toggle {
-    text-align: center;
-    margin-bottom: 25px;
-}
-
+#task-form-container { display: none; padding-top: 15px; padding-bottom: 5px; margin-bottom: 20px; }
+#add-task-toggle { text-align: center; margin-bottom: 25px; }
 #add-task-toggle button {
-    font-family: 'Comic Sans MS', cursive, sans-serif;
-    font-size: 1.2em;
-    padding: 12px 30px;
-    background-color: #d0e8ff; 
-    color: #4d94ff; 
-    border: 2px solid #4d94ff;
-    border-radius: 8px;
-    cursor: pointer;
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-    transition: all 0.2s;
+    font-family: 'Comic Sans MS', cursive, sans-serif; font-size: 1.2em; padding: 12px 30px; background-color: #d0e8ff; color: #4d94ff; border: 2px solid #4d94ff; border-radius: 8px; cursor: pointer; box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1); transition: all 0.2s;
 }
-
-#add-task-toggle button:hover {
-    background-color: #4d94ff;
-    color: white;
-}
+#add-task-toggle button:hover { background-color: #4d94ff; color: white; }
 
 
 /* Table Styling */
-table {
-    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-    background-color: #fafafa;
-}
-th { 
-    background-color: #ffb84d; 
-    color: #4a4a4a;
-    border-bottom: 3px solid #e09f3e;
-}
+table { box-shadow: 0 2px 5px rgba(0,0,0,0.1); background-color: #fafafa; }
+th { background-color: #ffb84d; color: #4a4a4a; border-bottom: 3px solid #e09f3e; }
 tr:nth-child(even) { background-color: #fcfcfc; }
 
 /* Calendar Grid */
 #calendar-view {
-    display: grid;
-    grid-template-columns: repeat(7, 1fr);
-    gap: 1px;
-    background-color: #ddd;
-    border: 1px solid #ccc;
-    min-height: 300px;
+    display: grid; grid-template-columns: repeat(7, 1fr); gap: 1px; background-color: #ddd; border: 1px solid #ccc; min-height: 300px;
 }
 .calendar-day { background-color: #fff; padding: 8px; min-height: 90px; }
 .calendar-header { background-color: #ffb84d; color: #4a4a4a; text-align: center; padding: 5px; font-weight: bold; }
@@ -221,12 +157,8 @@ tr:nth-child(even) { background-color: #fcfcfc; }
 .empty-day { background-color: #f9f9f9; color: #ccc; }
 
 /* Modal Styles */
-.modal {
-    display: none; position: fixed; z-index: 1001; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.4); 
-}
-.modal-content {
-    background-color: #fefefe; margin: 5% auto; padding: 20px; width: 90%; max-width: 1100px; border-radius: 8px; box-shadow: 0 5px 15px rgba(0,0,0,0.3);
-}
+.modal { display: none; position: fixed; z-index: 1001; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.4); }
+.modal-content { background-color: #fefefe; margin: 5% auto; padding: 20px; width: 90%; max-width: 1100px; border-radius: 8px; box-shadow: 0 5px 15px rgba(0,0,0,0.3); }
 .close { color: #aaa; float: right; font-size: 28px; font-weight: bold; cursor: pointer; }
 .close:hover { color: black; }
 #completed-search { width: 100%; padding: 10px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; }
