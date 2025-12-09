@@ -52,7 +52,7 @@ function getStatus(dueDate) {
     return { text: 'Upcoming', class: '', sortValue: diff };
 }
 
-// --- Storage ---
+// --- Persistence ---
 function loadTasks() {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored) {
@@ -257,6 +257,20 @@ window.sortTable = (key, modal=false) => {
 window.toggleCustomFrequency = () => {
     document.getElementById('customFrequencyDiv').style.display = document.getElementById('frequencySelect').value === 'custom' ? 'block' : 'none';
 };
+
+window.toggleFormVisibility = function() {
+    const formContainer = document.getElementById('task-form-container');
+    const button = document.querySelector('#add-task-toggle button');
+    
+    if (formContainer.style.display === 'none' || formContainer.style.display === '') {
+        formContainer.style.display = 'block';
+        button.textContent = '— Hide Task Input';
+    } else {
+        formContainer.style.display = 'none';
+        button.textContent = '+ Add New Task / Event';
+    }
+}
+
 
 // --- Form Handling ---
 function registerFormListener() {
