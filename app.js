@@ -14,7 +14,7 @@ function initTracker() {
     registerFormListener();
     toggleCustomFrequency(); 
     sortTable('dueDate');
-    renderCalendar(); // Ensure calendar renders
+    renderCalendar();
 }
 
 // --- Utility & Date Helpers ---
