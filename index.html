@@ -32,21 +32,21 @@
                     <option value="single">Single Event</option>
                     <option value="7" selected>Weekly</option>
                     <option value="14">Bi-Weekly</option>
-                    <option value="30">Monthly</                    </option>
+                    <option value="30">Monthly</option>
                     <option value="91">Quarterly</option>
                     <option value="365">Yearly</option>
                     <option value="custom">Custom (Days)</option>
                 </select>
             </div>
             
+            <div id="customFrequencyDiv" style="grid-column: 1 / 2; display: none;">
+                <label for="customDays">Custom Days:</label>
+                <input type="number" id="customDays" min="1">
+            </div>
+            
             <div style="grid-column: 1 / 3;">
                 <label for="description">Description:</label>
                 <textarea id="description" rows="2"></textarea>
-            </div>
-            
-            <div id="customFrequencyDiv" style="display: none;">
-                <label for="customDays">Custom Days:</label>
-                <input type="number" id="customDays" min="1">
             </div>
             
             <div>
@@ -162,4 +162,3 @@
     <script src="script.js"></script>
 </body>
 </html>
-
