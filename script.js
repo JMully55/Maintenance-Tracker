@@ -1,5 +1,6 @@
 let taskData = []; 
 const STORAGE_KEY = 'maintenanceTrackerTasks';
+const VISUAL_KEY = 'notepadVisualState'; // New key for session-only visual state
 
 // --- Initialization ---
 function initTracker() {
@@ -13,55 +14,39 @@ function initTracker() {
 
 // --- Utility & Date Helpers (omitted for brevity) ---
 const getToday = () => new Date().setHours(0, 0, 0, 0);
+function formatDate(date) { /* ... */ }
+function formatTimestamp(isoString) { /* ... */ }
+function createLocalDate(dateString) { /* ... */ }
+function calculateDueDate(lastComp, freqDays, isOneTime) { /* ... */ }
+function getStatus(dueDate) { /* ... */ }
 
-function formatDate(date) {
-    const d = new Date(date);
-    let m = '' + (d.getMonth() + 1), day = '' + d.getDate(), y = d.getFullYear();
-    if (m.length < 2) m = '0' + m;
-    if (day.length < 2) day = '0' + day;
-    return [y, m, day].join('-');
+// --- Persistence ---
+function loadTasks() {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (stored) {
+        taskData = JSON.parse(stored);
+        taskData.forEach(t => {
+            if (!t.completionHistory) t.completionHistory = [];
+            if (typeof t.isOneTime === 'undefined') t.isOneTime = false;
+        });
+    }
+}
+function saveTasks() { localStorage.setItem(STORAGE_KEY, JSON.stringify(taskData)); }
+
+// --- Visual State Persistence (NEW) ---
+function loadVisualState() {
+    // Loads the visual state array, which resets if the day changes or session ends
+    const state = sessionStorage.getItem(VISUAL_KEY);
+    return state ? JSON.parse(state) : [];
+}
+function saveVisualState(state) {
+    sessionStorage.setItem(VISUAL_KEY, JSON.stringify(state));
 }
 
-function formatTimestamp(isoString) {
-    const date = new Date(isoString);
-    return `${date.toLocaleDateString()} ${date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
-}
-
-function createLocalDate(dateString) {
-    const parts = dateString.split('-').map(p => parseInt(p, 10));
-    return new Date(parts[0], parts[1] - 1, parts[2]);
-}
-
-function calculateDueDate(lastComp, freqDays, isOneTime) {
-    if (isOneTime && freqDays === 0) return null;
-    if (!lastComp) return null;
-    const lastDate = createLocalDate(lastComp);
-    const nextDate = new Date(lastDate);
-    const frequency = parseInt(freqDays);
-    if (isNaN(frequency)) return null;
-
-    nextDate.setDate(lastDate.getDate() + frequency);
-    return nextDate;
-}
-
-function getStatus(dueDate) {
-    if (!dueDate) return { text: 'N/A', class: '', sortValue: 1000 };
-    const diff = Math.ceil((dueDate.setHours(0,0,0,0) - getToday()) / 86400000);
-    if (diff < 0) return { text: `OVERDUE (${Math.abs(diff)}d)`, class: 'status-overdue', sortValue: diff };
-    if (diff <= 30) return { text: `DUE IN ${diff}d`, class: 'status-due', sortValue: diff };
-    return { text: 'Upcoming', class: '', sortValue: diff };
-}
-
-// --- Persistence (omitted for brevity) ---
-function loadTasks() { /* ... */ }
-function saveTasks() { /* ... */ }
-
-// --- Calendar Logic (omitted for brevity) ---
+// --- Calendar & Modal Functions (omitted for brevity) ---
 function setupCalendarControls() { /* ... */ }
 function getRecurringDueDates(task, mStart, mEnd) { /* ... */ }
 window.renderCalendar = function() { /* ... */ };
-
-// --- Modal Functions (omitted for brevity) ---
 window.openHistoryModal = () => { /* ... */ };
 window.closeHistoryModal = () => { /* ... */ };
 window.openCompletedModal = () => { /* ... */ };
@@ -78,32 +63,31 @@ function renderNotepads() {
     const todayS = formatDate(now), start = new Date(now), end = new Date(start); 
     start.setDate(now.getDate() - now.getDay()); start.setHours(0,0,0,0); 
     end.setDate(start.getDate() + 6); end.setHours(23,59,59,999);
+    
+    const visualState = loadVisualState(); // Load session-only visual checkmarks
 
     taskData.forEach((t, i) => {
         const due = calculateDueDate(t.lastCompleted, t.frequencyDays, t.isOneTime);
         if (!due || (t.isOneTime && t.frequencyDays === 0)) return;
         const ds = formatDate(due);
         
-        // 🏆 NEW LOGIC: isCompletedToday only if lastCompleted is TODAY
-        const isCompletedToday = t.lastCompleted === todayS;
+        // Check if task is visually checked in THIS session
+        const isVisuallyChecked = visualState.includes(t.id);
         
-        // 🏆 NEW LOGIC: Determine if the item is clickable (only if due TODAY)
-        let clickAction = '';
-        if (ds === todayS) {
-             clickAction = isCompletedToday ? `markUndone(${i})` : `markDone(${i})`;
-        } else {
-             // For tasks due later this week, they are not immediately clickable in the notes
-             clickAction = ''; 
-        }
+        // We still use the *actual* lastCompleted date for the table/DB completion
+        const isCompletedTodayByDB = t.lastCompleted === todayS; 
+        
+        // 🏆 NEW LOGIC: Toggles the VISUAL state using the session ID, but only triggers DB update if due TODAY.
+        const completionAction = `toggleVisualDone(${t.id}, '${ds}')`; // Pass task ID and due date
 
-        const item = `<li><span class="notepad-checkbox" onclick="${clickAction}">${isCompletedToday?'✔️':'◻️'}</span>${t.taskName} (${ds})</li>`;
+        const item = `<li><span class="notepad-checkbox" onclick="${completionAction}">${isVisuallyChecked?'✔️':'◻️'}</span>${t.taskName}</li>`;
         
-        // Only show the task in the DAILY list if it's due today
+        // DAILY TASKS
         if (ds === todayS) {
             dl.innerHTML += item;
         }
 
-        // Show the task in the WEEKLY list if it's due this week
+        // WEEKLY TASKS (Shows up with checkmark if done in session or if due today/later this week)
         if (due >= start && due <= end) {
             wl.innerHTML += item;
         }
@@ -130,21 +114,51 @@ function renderDashboard() {
 }
 
 // --- Actions (MODIFIED) ---
-window.markDone = (idx) => {
-    const t = taskData[idx];
-    const due = calculateDueDate(t.lastCompleted, t.frequencyDays, t.isOneTime);
-    const todayFormatted = formatDate(new Date());
 
-    // 🏆 PRIMARY FIX: Only run if the calculated due date is TODAY
-    if (due && formatDate(due) !== todayFormatted) {
-         console.warn("Attempted to mark done a task not due today.");
-         return; // Prevent marking tasks due later this week as done
+// 🏆 NEW: Handles the visual toggle and conditionally triggers markDone
+window.toggleVisualDone = (taskId, dueDateStr) => {
+    const todayS = formatDate(new Date());
+    const visualState = loadVisualState();
+    const taskIndex = visualState.indexOf(taskId);
+
+    if (taskIndex === -1) {
+        // If UNCHECKED, mark visually checked
+        visualState.push(taskId);
+
+        // If the task is due TODAY, trigger the full database completion.
+        if (dueDateStr === todayS) {
+            markDone(taskId);
+        }
+    } else {
+        // If CHECKED, remove visual checkmark
+        visualState.splice(taskIndex, 1);
+        
+        // If the task was due TODAY, reverse the database completion.
+        if (dueDateStr === todayS) {
+            markUndone(taskId);
+        }
     }
     
-    // Check if already marked done today (prevent double execution)
-    if (t.lastCompleted === todayFormatted) return; 
+    saveVisualState(visualState);
+    renderDashboard(); // Rerender to show the new checkmark status
+};
 
-    t.completionHistory.push({ timestamp: new Date().toISOString(), dateOnly: todayFormatted });
+
+window.markDone = (idx) => {
+    const t = taskData.find(t => t.id === idx);
+    const now = new Date();
+    const todayFormatted = formatDate(now);
+
+    if (!t || t.lastCompleted === todayFormatted) return; 
+    
+    // Check if the task is currently checked visually, if not, check it visually first.
+    const visualState = loadVisualState();
+    if (!visualState.includes(t.id)) {
+        visualState.push(t.id);
+        saveVisualState(visualState);
+    }
+    
+    t.completionHistory.push({ timestamp: now.toISOString(), dateOnly: todayFormatted });
     t.lastCompleted = todayFormatted;
 
     if (t.isOneTime) t.frequencyDays = 0;
@@ -153,10 +167,12 @@ window.markDone = (idx) => {
 };
 
 window.markUndone = (idx) => {
-    const t = taskData[idx];
+    const t = taskData.find(t => t.id === idx);
     const todayFormatted = formatDate(new Date());
 
-    // 1. Remove today's completion entry
+    if (!t) return;
+    
+    // 1. Remove today's completion entry from the DB
     const historyIndex = t.completionHistory.findIndex(h => h.dateOnly === todayFormatted);
     if (historyIndex > -1) {
         t.completionHistory.splice(historyIndex, 1);
@@ -179,27 +195,14 @@ window.markUndone = (idx) => {
 };
 
 
-window.skipTask = (idx) => {
-    const t = taskData[idx];
-    const due = calculateDueDate(t.lastCompleted, t.frequencyDays, false);
-    t.lastCompleted = formatDate(due);
-    renderDashboard();
-};
-
-window.deleteTask = (idx) => {
-    if (confirm("Permanently delete this task?")) { taskData.splice(idx, 1); renderDashboard(); }
-};
-
-window.sortTable = (key, modal=false) => {
-    taskData.sort((a,b) => (a[key] > b[key] ? 1 : -1));
-    modal ? renderHistoryModal() : renderDashboard();
-};
+window.skipTask = (idx) => { /* ... */ };
+window.deleteTask = (idx) => { /* ... */ };
+window.sortTable = (key, modal=false) => { /* ... */ };
 
 window.toggleCustomFrequency = () => {
     document.getElementById('customFrequencyDiv').style.display = document.getElementById('frequencySelect').value === 'custom' ? 'block' : 'none';
 };
 
-// 🏆 TOGGLE VISIBILITY FIX: The function itself is fine, but the button call must be correct in HTML.
 window.toggleFormVisibility = function() {
     const formContainer = document.getElementById('task-form-container');
     const button = document.querySelector('#add-task-toggle button');
@@ -215,51 +218,4 @@ window.toggleFormVisibility = function() {
 
 
 // --- Form Handling ---
-function registerFormListener() {
-    document.getElementById('task-form').onsubmit = (e) => {
-        e.preventDefault();
-        const fv = document.getElementById('frequencySelect').value;
-        const oneTime = fv === 'single';
-        let freq = oneTime ? 1 : (fv === 'custom' ? parseInt(document.getElementById('customDays').value) : parseInt(fv));
-        const inputDate = document.getElementById('dateInput').value; 
-
-        let lastCompletedDate = '';
-
-        if (isNaN(freq) || freq <= 0) {
-            alert("Please enter a valid positive number for Frequency or select a standard interval.");
-            return;
-        }
-        if (!inputDate) {
-            alert("Please enter a Date.");
-            return;
-        }
-
-        const targetDate = createLocalDate(inputDate);
-        const initialLastCompleted = new Date(targetDate);
-            
-        initialLastCompleted.setDate(targetDate.getDate() - freq);
-        lastCompletedDate = formatDate(initialLastCompleted);
-        
-        // Prepare initial history
-        const initialHistory = [];
-        if (lastCompletedDate) {
-             initialHistory.push({
-                timestamp: new Date(lastCompletedDate).toISOString(),
-                dateOnly: lastCompletedDate
-            });
-        }
-
-        taskData.push({
-            taskName: document.getElementById('taskName').value,
-            category: document.getElementById('category').value,
-            description: document.getElementById('description').value,
-            frequencyDays: freq, 
-            lastCompleted: lastCompletedDate, 
-            isOneTime: oneTime, 
-            completionHistory: initialHistory 
-        });
-        renderDashboard(); 
-        e.target.reset(); 
-        toggleCustomFrequency();
-    };
-}
+function registerFormListener() { /* ... */ }
