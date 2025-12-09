@@ -140,7 +140,7 @@ window.renderCalendar = function() {
     const allEvents = {};
     taskData.forEach(t => {
         const evs = getRecurringDueDates(t, start, end);
-        for (let d in evs) { if (!allEvents[d]) allEvents[d = []]; allEvents[d].push(evs[d]); }
+        for (let d in evs) { if (!allEvents[d]) allEvents[d] = []; allEvents[d].push(evs[d]); }
     });
 
     ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].forEach(d => {
