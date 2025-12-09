@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -48,6 +47,27 @@
 
         ---
 
+        <div id="side-buttons">
+            <button id="open-history-modal" onclick="openHistoryModal()">View All Tasks & History</button> 
+            <button id="open-completed-modal" onclick="openCompletedModal()">View Completed Goals 🏆</button> 
+        </div>
+        
+        <h2>🎯 Quick Focus Dashboard</h2>
+        <section id="focus-notepads">
+            <div class="notepad daily-focus">
+                <h3>Today's Tasks</h3> 
+                <ul id="daily-tasks-list">
+                    </ul>
+            </div>
+            <div class="notepad weekly-focus">
+                <h3>This Week's Tasks</h3>
+                <ul id="weekly-tasks-list">
+                    </ul>
+            </div>
+        </section>
+
+        ---
+
         <h2>🗓️ Maintenance Schedule Calendar</h2>
         <div id="calendar-controls">
             <label for="month-select">Month:</label>
@@ -78,23 +98,48 @@
                 </tbody>
         </table>
 
-        ---
+    </div>
 
-        <h2>📝 Task History (All Tasks)</h2>
-        <table>
-            <thead>
-                <tr>
-                    <th onclick="sortTable('lastCompleted')">Last Completed ⬇️</th>
-                    <th onclick="sortTable('taskName')">Task</th>
-                    <th onclick="sortTable('category')">Category</th>
-                    <th>Frequency</th>
-                    <th>Description</th>
-                    <th>Actions</th>
-                </tr>
-            </thead>
-            <tbody id="history-list">
-                </tbody>
-        </table>
+    <div id="history-modal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeHistoryModal()">&times;</span>
+            <h2>📝 All Active Tasks & History</h2>
+            <table id="all-tasks-table">
+                <thead>
+                    <tr>
+                        <th onclick="sortTable('lastCompleted', true)">Last Completed ⬇️</th>
+                        <th onclick="sortTable('taskName', true)">Task</th>
+                        <th onclick="sortTable('category', true)">Category</th>
+                        <th>Frequency</th>
+                        <th>Description</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="history-list">
+                    </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div id="completed-modal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeCompletedModal()">&times;</span>
+            <h2>🏆 Completed Goals History</h2>
+            <div id="completed-search-container">
+                <input type="text" id="completed-search" placeholder="Search task name or category..." onkeyup="renderCompletedModal()">
+            </div>
+            <table id="completed-tasks-table">
+                <thead>
+                    <tr>
+                        <th>Completion Date & Time</th>
+                        <th>Task Name</th>
+                        <th>Category</th>
+                    </tr>
+                </thead>
+                <tbody id="completed-list">
+                    </tbody>
+            </table>
+        </div>
     </div>
 
     <script src="script.js"></script>
