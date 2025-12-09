@@ -4,7 +4,8 @@ const STORAGE_KEY = 'maintenanceTrackerTasks';
 // --- Initialization ---
 function initTracker() {
     loadTasks();
-    taskData.forEach((t, i) => t.id = i);
+    // CRITICAL: Ensure every task has a static ID based on its index
+    taskData.forEach((t, i) => t.id = i); 
     setupCalendarControls();
     registerFormListener();
     toggleCustomFrequency(); 
@@ -167,7 +168,7 @@ window.renderCalendar = function() {
     }
 };
 
-// --- Modal Functions (Guard Clause Fixed) ---
+// --- Modal Functions (Working) ---
 window.openHistoryModal = () => { 
     const modal = document.getElementById('history-modal');
     if (modal) {
@@ -207,7 +208,8 @@ function renderHistoryModal() {
     taskData.forEach((t, i) => {
         if (t.isOneTime && t.frequencyDays === 0) return;
         const row = document.createElement('tr');
-        row.innerHTML = `<td>${t.lastCompleted}</td><td>${t.taskName}</td><td>${t.category}</td><td>${t.frequencyDays}d</td><td>${t.description}</td><td><button class="delete-button-history" onclick="deleteTask(${i})">Delete</button></td>`;
+        // CRITICAL FIX: Use t.id for actions instead of i (array index)
+        row.innerHTML = `<td>${t.lastCompleted}</td><td>${t.taskName}</td><td>${t.category}</td><td>${t.frequencyDays}d</td><td>${t.description}</td><td><button class="delete-button-history" onclick="deleteTask(${t.id})">Delete</button></td>`;
         list.appendChild(row);
     });
 }
@@ -249,7 +251,8 @@ function renderNotepads() {
         
         const isCompletedToday = t.lastCompleted === todayS;
         
-        const itemTemplate = (action, symbol) => `<li><span class="notepad-checkbox" onclick="${action}(${i})">${symbol}</span>${t.taskName}</li>`;
+        // CRITICAL FIX: Use t.id for actions instead of array index i
+        const itemTemplate = (action, symbol) => `<li><span class="notepad-checkbox" onclick="${action}(${t.id})">${symbol}</span>${t.taskName}</li>`;
 
         // 1. Check if due TODAY
         if (ds === todayS) {
@@ -299,17 +302,21 @@ function renderDashboard() {
         const status = getStatus(due);
         if (status.sortValue <= 30) {
             const row = document.createElement('tr'); row.className = status.class;
+            // CRITICAL FIX: Use t.id for actions instead of i (array index)
             row.innerHTML = `<td>${formatDate(due)}</td><td>${t.taskName}</td><td>${t.category}</td><td>${status.text}</td>
-            <td><button onclick="markDone(${i})">Done</button> ${t.isOneTime?'':`<button class="skip-button" onclick="skipTask(${i})">Skip</button>`} <button class="delete-button" onclick="deleteTask(${i})">Delete</button></td>`;
+            <td><button onclick="markDone(${t.id})">Done</button> ${t.isOneTime?'':`<button class="skip-button" onclick="skipTask(${t.id})">Skip</button>`} <button class="delete-button" onclick="deleteTask(${t.id})">Delete</button></td>`;
             list.appendChild(row);
         }
     });
     renderCalendar(); renderNotepads(); saveTasks();
 }
 
-// --- Actions ---
-window.markDone = (idx) => {
-    const t = taskData[idx];
+// --- Actions (Updated to find task by ID) ---
+window.markDone = (taskId) => {
+    // Find task by static ID
+    const t = taskData.find(task => task.id === taskId);
+    if (!t) return;
+    
     const now = new Date();
     const todayFormatted = formatDate(now);
 
@@ -323,8 +330,11 @@ window.markDone = (idx) => {
     renderDashboard();
 };
 
-window.markUndone = (idx) => {
-    const t = taskData[idx];
+window.markUndone = (taskId) => {
+    // Find task by static ID
+    const t = taskData.find(task => task.id === taskId);
+    if (!t) return;
+    
     const todayFormatted = formatDate(new Date());
 
     // 1. Remove today's completion entry
@@ -350,15 +360,27 @@ window.markUndone = (idx) => {
 };
 
 
-window.skipTask = (idx) => {
-    const t = taskData[idx];
+window.skipTask = (taskId) => {
+    // Find task by static ID
+    const t = taskData.find(task => task.id === taskId);
+    if (!t) return;
+    
     const due = calculateDueDate(t.lastCompleted, t.frequencyDays, false);
     t.lastCompleted = formatDate(due);
     renderDashboard();
 };
 
-window.deleteTask = (idx) => {
-    if (confirm("Permanently delete this task?")) { taskData.splice(idx, 1); renderDashboard(); }
+window.deleteTask = (taskId) => {
+    if (confirm("Permanently delete this task?")) { 
+        // Find task index in array by static ID
+        const indexToDelete = taskData.findIndex(t => t.id === taskId);
+        if (indexToDelete > -1) {
+            taskData.splice(indexToDelete, 1);
+            // Re-index simple IDs for stability after deletion
+            taskData.forEach((t, i) => t.id = i);
+        }
+        renderDashboard(); 
+    }
 };
 
 window.sortTable = (key, modal=false) => {
