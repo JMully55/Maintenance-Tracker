@@ -71,14 +71,11 @@
                     <textarea id="description" rows="2"></textarea>
                 </div>
                 
-                <div>
-                    <label for="lastCompleted">Last Completed Date (If done previously):</label>
-                    <input type="date" id="lastCompleted"> 
+                <div style="grid-column: 1 / 3;">
+                    <label for="dateInput">Date (Last Completed OR Next Target):</label>
+                    <input type="date" id="dateInput"> 
                 </div>
-                <div>
-                    <label for="targetDueDate">OR Target Next Due Date (Required for single event/new task):</label>
-                    <input type="date" id="targetDueDate"> 
-                </div>
+
                 <button type="submit" style="grid-column: 1 / -1;">Add Task</button>
             </form>
         </div>
@@ -92,7 +89,7 @@
 
         ---
 
-        <h2>🗓️ Maintenance Schedule Calendar</h2>
+        <h2>🗓️ Task Calendar</h2>
         <div id="calendar-controls">
             <label for="month-select">Month:</label>
             <select id="month-select" onchange="renderCalendar()"></select>
