@@ -1,4 +1,4 @@
-/* Basic CSS for readability and structure */
+/* General Layout */
 body {
     font-family: Arial, sans-serif;
     margin: 20px;
@@ -16,6 +16,8 @@ h1, h2 {
     color: #333;
     text-align: center;
 }
+
+/* Form Styling */
 form {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
@@ -32,30 +34,11 @@ form label {
     margin-bottom: 5px;
 }
 form input, form select, form textarea {
-    width: 90%;
+    width: 95%;
     padding: 8px;
     border: 1px solid #ccc;
     border-radius: 4px;
 }
-/* Buttons used in tables */
-button {
-    padding: 5px 10px;
-    background-color: #5cb85c;
-    color: white;
-    border: none;
-    cursor: pointer;
-    border-radius: 4px;
-    font-size: 14px;
-    transition: background-color 0.3s;
-    margin-right: 5px;
-}
-button.delete-button {
-    background-color: #d9534f;
-}
-button.skip-button {
-    background-color: #f0ad4e;
-}
-/* Style for the submit button in the form */
 form button[type="submit"] {
     grid-column: 1 / -1;
     padding: 10px 20px;
@@ -65,7 +48,56 @@ form button[type="submit"] {
     cursor: pointer;
     border-radius: 4px;
     font-size: 16px;
+    font-weight: bold;
 }
+
+/* Side-by-Side Control Buttons */
+#control-buttons {
+    display: flex;
+    justify-content: center;
+    gap: 20px;
+    margin: 20px 0 30px;
+    padding: 10px;
+}
+#control-buttons button {
+    padding: 12px 20px;
+    font-size: 15px;
+    width: 260px;
+    background-color: #007bff;
+    color: white;
+    font-weight: bold;
+    border-radius: 4px;
+    border: none;
+    cursor: pointer;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+#open-completed-modal {
+    background-color: #28a745 !important;
+}
+
+/* Focus Notepads (Sticky Notes) */
+#focus-notepads {
+    display: flex;
+    justify-content: space-around;
+    gap: 20px;
+    margin-bottom: 30px;
+}
+.notepad {
+    flex: 1;
+    min-height: 180px;
+    padding: 15px;
+    border-radius: 5px;
+    box-shadow: 2px 2px 8px rgba(0, 0, 0, 0.15);
+}
+.daily-focus { background-color: #fffd8b; transform: rotate(-1deg); }
+.weekly-focus { background-color: #b3e5fc; transform: rotate(1deg); }
+.notepad h3 { margin-top: 0; border-bottom: 1px solid rgba(0,0,0,0.1); }
+.notepad ul { list-style: none; padding: 0; }
+.notepad li { padding: 5px 0; display: flex; align-items: center; border-bottom: 1px dotted rgba(0,0,0,0.05); }
+.notepad-checkbox { cursor: pointer; margin-right: 10px; font-size: 1.2em; }
+.completed-task-note { text-decoration: line-through; color: #777; }
+
+/* Table Styling */
 table {
     width: 100%;
     border-collapse: collapse;
@@ -76,217 +108,50 @@ th, td {
     text-align: left;
     border-bottom: 1px solid #ddd;
 }
-th {
-    background-color: #337ab7;
-    color: white;
-    cursor: pointer;
-}
-tr:nth-child(even) {
-    background-color: #f2f2f2;
-}
-/* Status Highlighting */
-.status-due {
-    background-color: #fcf8e3; /* Light Yellow */
-    color: #8a6d3b;
-    font-weight: bold;
-}
-.status-overdue {
-    background-color: #f2dede; /* Light Red */
-    color: #a94442;
-    font-weight: bold;
-    animation: pulse 1s infinite alternate;
-}
-@keyframes pulse {
-    from { opacity: 1; }
-    to { opacity: 0.8; }
-}
-.complete-checkbox {
-    cursor: pointer;
-    width: 20px;
-    height: 20px;
-    vertical-align: middle;
-    margin-right: 5px;
-}
+th { background-color: #337ab7; color: white; cursor: pointer; }
+tr:nth-child(even) { background-color: #f2f2f2; }
 
-/* Control Button Positioning (Side-by-side) */
-#control-buttons {
-    display: flex;
-    justify-content: center;
-    gap: 20px;
-    margin: 20px 0 30px;
-    padding: 10px;
+/* Status Colors */
+.status-due { background-color: #fcf8e3; color: #8a6d3b; font-weight: bold; }
+.status-overdue { background-color: #f2dede; color: #a94442; font-weight: bold; animation: pulse 1.5s infinite alternate; }
+@keyframes pulse { from { opacity: 1; } to { opacity: 0.7; } }
+
+/* Table Buttons */
+button.delete-button, button.delete-button-history { background-color: #d9534f; color: white; border: none; border-radius: 4px; cursor: pointer; padding: 5px 10px; }
+button.skip-button { background-color: #f0ad4e; color: white; border: none; border-radius: 4px; cursor: pointer; padding: 5px 10px; margin-right: 5px; }
+
+/* Modal Design */
+.modal {
+    display: none;
+    position: fixed;
+    z-index: 2000;
+    left: 0; top: 0; width: 100%; height: 100%;
+    background-color: rgba(0,0,0,0.5);
 }
-
-#control-buttons button {
-    padding: 10px 20px;
-    font-size: 16px; 
-    width: 250px; 
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-    
-    background-color: #007bff; 
-    color: white;
-    font-weight: bold;
+.modal-content {
+    background-color: white;
+    margin: 5% auto;
+    padding: 25px;
+    width: 85%;
+    max-width: 1000px;
+    border-radius: 10px;
+    max-height: 80vh;
+    overflow-y: auto;
 }
+.close { float: right; font-size: 28px; font-weight: bold; cursor: pointer; color: #aaa; }
+.close:hover { color: black; }
+#completed-search { width: 100%; padding: 12px; margin-bottom: 20px; border: 1px solid #ccc; border-radius: 5px; }
 
-#open-completed-modal {
-    background-color: #28a745 !important; /* Green for Completed Goals */
-}
-
-
-/* Notepad Styles */
-#focus-notepads {
-    display: flex;
-    justify-content: space-around;
-    gap: 20px;
-    margin-bottom: 30px;
-}
-
-.notepad {
-    flex: 1;
-    min-height: 200px;
-    padding: 15px;
-    border-radius: 5px;
-    box-shadow: 2px 2px 8px rgba(0, 0, 0, 0.2);
-    font-family: 'Georgia', serif;
-}
-
-.daily-focus {
-    background-color: #fffd8b; /* Yellow sticky note */
-    transform: rotate(-1deg);
-}
-
-.weekly-focus {
-    background-color: #b3e5fc; /* Light blue sticky note */
-    transform: rotate(1deg);
-}
-
-.notepad h3 {
-    margin-top: 0;
-    border-bottom: 1px solid rgba(0, 0, 0, 0.2);
-    padding-bottom: 5px;
-    font-size: 1.2em;
-}
-
-.notepad ul {
-    list-style: none;
-    padding: 0;
-}
-
-.notepad li {
-    padding: 5px 0;
-    display: flex;
-    align-items: center;
-    border-bottom: 1px dotted rgba(0, 0, 0, 0.1);
-}
-
-.notepad li:last-child {
-    border-bottom: none;
-}
-
-/* Checkmark styling */
-.notepad-checkbox {
-    cursor: pointer;
-    margin-right: 10px;
-    font-size: 1.2em;
-    min-width: 20px;
-    text-align: center;
-}
-
-.completed-task-note {
-    text-decoration: line-through;
-    color: #666;
-}
-
-
-/* Calendar View Styles */
-#calendar-controls {
-    display: flex;
-    justify-content: center;
-    gap: 20px;
-    margin-bottom: 15px;
-}
+/* Calendar Grid */
 #calendar-view {
     display: grid;
     grid-template-columns: repeat(7, 1fr);
     gap: 1px;
-    background-color: #ccc;
+    background-color: #ddd;
     border: 1px solid #ccc;
 }
-.calendar-day {
-    background-color: #fff;
-    padding: 10px;
-    height: 100px;
-    overflow-y: auto;
-    font-size: 0.9em;
-}
-.calendar-header {
-    background-color: #337ab7;
-    color: white;
-    text-align: center;
-    padding: 5px;
-    font-weight: bold;
-}
-.task-event {
-    background-color: #5cb85c;
-    color: white;
-    padding: 2px 4px;
-    margin-bottom: 2px;
-    border-radius: 3px;
-    font-size: 0.8em;
-    cursor: default;
-}
-.task-event.overdue {
-    background-color: #a94442;
-}
-.empty-day {
-    background-color: #eee;
-}
-
-/* Modal Styles */
-.modal {
-    display: none; 
-    position: fixed;
-    z-index: 1001;
-    left: 0;
-    top: 0;
-    width: 100%;
-    height: 100%;
-    overflow: auto;
-    background-color: rgba(0,0,0,0.4); 
-}
-
-.modal-content {
-    background-color: #fefefe;
-    margin: 5% auto; 
-    padding: 20px;
-    border: 1px solid #888;
-    width: 90%; 
-    max-width: 1100px;
-    border-radius: 8px;
-    box-shadow: 0 5px 15px rgba(0,0,0,0.3);
-}
-
-.close {
-    color: #aaa;
-    float: right;
-    font-size: 28px;
-    font-weight: bold;
-}
-
-.close:hover,
-.close:focus {
-    color: black;
-    text-decoration: none;
-    cursor: pointer;
-}
-
-#completed-search-container {
-    margin-bottom: 20px;
-}
-#completed-search {
-    width: 100%;
-    padding: 10px;
-    box-sizing: border-box;
-    border: 1px solid #ccc;
-    border-radius: 4px;
-}
+.calendar-day { background-color: #fff; padding: 8px; min-height: 90px; }
+.calendar-header { background-color: #337ab7; color: white; text-align: center; padding: 5px; font-weight: bold; }
+.task-event { background-color: #5cb85c; color: white; padding: 2px 4px; margin-bottom: 2px; border-radius: 3px; font-size: 0.75em; }
+.task-event.overdue { background-color: #a94442; }
+.empty-day { background-color: #f9f9f9; color: #ccc; }
