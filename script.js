@@ -172,7 +172,7 @@ window.renderCalendar = function() {
     }
 };
 
-// --- Modal Functions (Working) ---
+// --- Modal Functions (omitted for brevity) ---
 window.openHistoryModal = () => { 
     const modal = document.getElementById('history-modal');
     if (modal) { modal.style.display = 'block'; renderHistoryModal(); }
@@ -226,7 +226,7 @@ function renderCompletedModal() {
     });
 }
 
-// --- Dashboard ---
+// --- Dashboard (FIXED POST-IT MOVEMENT) ---
 function renderNotepads() {
     const dl = document.getElementById('daily-tasks-list'), wl = document.getElementById('weekly-tasks-list'), cl = document.getElementById('completed-tasks-list');
     if (!dl || !wl || !cl) return; 
@@ -251,7 +251,6 @@ function renderNotepads() {
         
         const isCompletedToday = t.lastCompleted === todayS;
         
-        // Use t.id for actions instead of array index i
         const itemTemplate = (action, symbol) => `<li><span class="notepad-checkbox" onclick="${action}(${t.id})">${symbol}</span>${t.taskName}</li>`;
 
         // 1. Check if due TODAY
