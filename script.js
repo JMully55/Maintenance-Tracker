@@ -29,7 +29,13 @@ function createLocalDate(dateString) {
     return new Date(parts[0], parts[1] - 1, parts[2]);
 }
 
-function calculateDueDate(lastCompletedDate, frequencyDays) {
+function calculateDueDate(lastCompletedDate, frequencyDays, isOneTime) {
+    // Logic: If it's a one-time event, the task should only appear once (based on its initial lastCompletedDate)
+    // After completion, the frequency is set to 0, which prevents recurrence here.
+    if (isOneTime && frequencyDays === 0) {
+        return null; 
+    }
+    
     if (!lastCompletedDate) return null;
     const lastDate = createLocalDate(lastCompletedDate);
     const nextDate = new Date(lastDate);
@@ -59,17 +65,18 @@ function loadTasks() {
     const storedData = localStorage.getItem(STORAGE_KEY);
     if (storedData) {
         taskData = JSON.parse(storedData); 
-        // Ensure old tasks that didn't have completionHistory get the array
         taskData.forEach(task => {
             if (!task.completionHistory) {
                 task.completionHistory = [];
-                // If lastCompleted exists but history is empty, add the lastCompleted date to history
                 if (task.lastCompleted) {
                     task.completionHistory.push({
                         timestamp: new Date(task.lastCompleted).toISOString(),
                         dateOnly: task.lastCompleted
                     });
                 }
+            }
+            if (typeof task.isOneTime === 'undefined') {
+                task.isOneTime = false;
             }
         });
     }
@@ -109,14 +116,35 @@ function setupCalendarControls() {
 
 function getRecurringDueDates(task, monthStart, monthEnd) {
     const events = {};
+    
+    // If one-time AND completed (frequency is 0), skip rendering
+    if (task.isOneTime && task.frequencyDays === 0) {
+        return events;
+    }
     if (!task.lastCompleted) return events;
 
     const frequency = parseInt(task.frequencyDays);
-    if (isNaN(frequency) || frequency <= 0) return events;
+    if (isNaN(frequency) || frequency <= 0) {
+         // Handle one-time uncompleted task which has a frequency of 1
+         if(task.isOneTime && frequency === 1) {
+            const nextDueDate = calculateDueDate(task.lastCompleted, 1, true);
+            if (nextDueDate >= monthStart && nextDueDate <= monthEnd) {
+                 const dateString = formatDate(nextDueDate);
+                 events[dateString] = {
+                    taskName: `${task.taskName} (One-Time)`,
+                    isOverdue: nextDueDate.getTime() < getToday(),
+                 };
+            }
+            return events;
+         }
+         return events;
+    }
 
-    let currentDate = calculateDueDate(task.lastCompleted, frequency);
+    // Start with the calculated next due date
+    let currentDate = calculateDueDate(task.lastCompleted, frequency, false);
     currentDate.setHours(0, 0, 0, 0); 
 
+    // Loop through all recurring dates
     while (currentDate.getTime() <= monthEnd.getTime()) {
         
         if (currentDate.getTime() >= monthStart.getTime()) {
@@ -210,7 +238,7 @@ window.renderCalendar = function() {
 }
 
 
-// --- Modal Functions ---
+// --- Modal Functions (No change) ---
 
 window.openHistoryModal = function() {
     document.getElementById('history-modal').style.display = 'block';
@@ -223,7 +251,6 @@ window.closeHistoryModal = function() {
 
 window.openCompletedModal = function() {
     document.getElementById('completed-modal').style.display = 'block';
-    // Clear search and render initial history
     document.getElementById('completed-search').value = ''; 
     renderCompletedModal(); 
 }
@@ -257,20 +284,38 @@ function renderNotepads() {
 
     const TODAY_STR = formatDate(TODAY);
     const TODAY_TIME = getToday();
-    const WEEK_END_TIME = TODAY_TIME + (7 * 24 * 60 * 60 * 1000);
+    
+    // Determine current Sunday-to-Saturday week
+    const currentDayOfWeek = TODAY.getDay();
+    const weekStart = new Date(TODAY);
+    weekStart.setDate(TODAY.getDate() - currentDayOfWeek);
+    weekStart.setHours(0, 0, 0, 0); 
+    
+    const weekEnd = new Date(weekStart);
+    weekEnd.setDate(weekStart.getDate() + 6);
+    weekEnd.setHours(23, 59, 59, 999);
+    
+    const WEEK_START_TIME = weekStart.getTime();
+    const WEEK_END_TIME = weekEnd.getTime();
+
 
     // Filter tasks that are due today or this week
     taskData.forEach(task => {
-        const nextDueDate = calculateDueDate(task.lastCompleted, task.frequencyDays);
+        // Pass isOneTime flag
+        const nextDueDate = calculateDueDate(task.lastCompleted, task.frequencyDays, task.isOneTime);
+        
+        // Skip rendering one-time tasks that have already been completed
+        if (task.isOneTime && task.frequencyDays === 0) return; 
         if (!nextDueDate) return;
 
         const dueTime = nextDueDate.setHours(0, 0, 0, 0);
-        // Check if the task's LAST completion date matches today's date (it was completed today)
         const isCompletedToday = (task.lastCompleted === TODAY_STR);
         const isOverdue = dueTime < TODAY_TIME;
         
         const statusClass = isOverdue ? 'status-overdue' : '';
         const taskStatusClass = isCompletedToday ? 'completed-task-note' : statusClass;
+        const taskDisplay = task.isOneTime ? `${task.taskName} (One-Time)` : task.taskName;
+
 
         // Generate the list item HTML for both notepads
         const listItemHTML = `
@@ -282,7 +327,7 @@ function renderNotepads() {
                 >
                     ${isCompletedToday ? '✔️' : (isOverdue ? '❌' : '◻️')}
                 </span>
-                ${task.taskName} (${task.category})
+                ${taskDisplay} (${task.category})
             </li>
         `;
         
@@ -291,8 +336,8 @@ function renderNotepads() {
             dailyList.innerHTML += listItemHTML;
         }
 
-        // 2. WEEKLY TASKS (Due today or within the next 7 days)
-        if (dueTime >= TODAY_TIME && dueTime < WEEK_END_TIME) {
+        // 2. WEEKLY TASKS (Due within the current Sunday-to-Saturday span)
+        if (dueTime >= WEEK_START_TIME && dueTime <= WEEK_END_TIME) {
             weeklyList.innerHTML += listItemHTML;
         }
     });
@@ -311,12 +356,17 @@ function renderHistoryModal() {
     historyList.innerHTML = '';
     
     taskData.forEach((task, index) => {
+        // Skip rendering one-time tasks that have already been completed
+        if (task.isOneTime && task.frequencyDays === 0) return; 
+        
         task.id = taskData.indexOf(task); 
+        const taskDisplay = task.isOneTime ? `${task.taskName} (One-Time)` : task.taskName;
+
 
         const historyRow = document.createElement('tr');
         historyRow.innerHTML = `
             <td>${task.lastCompleted || 'N/A'}</td>
-            <td>${task.taskName}</td>
+            <td>${taskDisplay}</td>
             <td>${task.category}</td>
             <td>${task.frequencyDays} days</td>
             <td>${task.description}</td>
@@ -379,7 +429,12 @@ function renderDashboard() {
 
     // Filter and render Coming Up List
     taskData.forEach((task, index) => {
-        const dueDate = calculateDueDate(task.lastCompleted, task.frequencyDays);
+        // Pass isOneTime flag to calculateDueDate
+        const dueDate = calculateDueDate(task.lastCompleted, task.frequencyDays, task.isOneTime);
+        
+        // Skip rendering if it's a completed one-time task
+        if (task.isOneTime && task.frequencyDays === 0) return;
+        
         const status = getStatus(dueDate);
         
         task.dueDate = dueDate ? dueDate.getTime() : null;
@@ -388,18 +443,21 @@ function renderDashboard() {
         task.statusClass = status.class;
         task.id = index;
 
+        const taskDisplay = task.isOneTime ? `${task.taskName} (One-Time)` : task.taskName;
+
+
         // --- 1. Coming Up Table ---
         if (status.sortValue <= 30) {
             const row = document.createElement('tr');
             row.className = status.class;
             row.innerHTML = `
                 <td>${dueDate ? formatDate(dueDate) : 'N/A'}</td>
-                <td>${task.taskName}</td>
+                <td>${taskDisplay}</td>
                 <td>${task.category}</td>
                 <td>${status.text}</td>
                 <td>
                     <input type="checkbox" class="complete-checkbox" data-id="${task.id}" title="Mark Complete" />
-                    <button class="skip-button" data-id="${task.id}" title="Skip one cycle">Skip</button>
+                    ${task.isOneTime ? '' : `<button class="skip-button" data-id="${task.id}" title="Skip one cycle">Skip</button>`}
                     <button class="delete-button" data-id="${task.id}" title="Delete Task">Delete</button>
                 </td>
             `;
@@ -472,6 +530,11 @@ function handleTaskAction(event) {
             
             task.lastCompleted = nowFormatted;
             
+            // If one-time, set frequency to 0 to prevent future recurrence checks
+            if (task.isOneTime) {
+                task.frequencyDays = 0; 
+            }
+            
             renderDashboard(); 
             if(document.getElementById('history-modal').style.display === 'block') {
                  renderHistoryModal();
@@ -482,7 +545,7 @@ function handleTaskAction(event) {
         }
     } else if (target.classList.contains('skip-button')) {
         if (task) {
-            const currentDueDate = calculateDueDate(task.lastCompleted, task.frequencyDays);
+            const currentDueDate = calculateDueDate(task.lastCompleted, task.frequencyDays, task.isOneTime);
             const newDueDate = new Date(currentDueDate);
             newDueDate.setDate(currentDueDate.getDate() + parseInt(task.frequencyDays));
             
@@ -517,16 +580,31 @@ function registerFormListener() {
     document.getElementById('task-form').addEventListener('submit', function(event) {
         event.preventDefault();
 
+        const isOneTime = document.getElementById('oneTimeEvent').checked;
         let lastCompletedDate = document.getElementById('lastCompleted').value;
         const targetDueDate = document.getElementById('targetDueDate').value;
-        const frequency = parseInt(document.getElementById('frequencyDays').value);
+        let frequency = parseInt(document.getElementById('frequencyDays').value);
         
-        if (isNaN(frequency)) {
-            alert("Please enter a valid Frequency (Days).");
+        if (!isOneTime && isNaN(frequency)) {
+            alert("Please enter a valid Frequency (Days) for a recurring task.");
             return;
         }
+        if (isOneTime && !targetDueDate) {
+            alert("Please specify a Target Next Due Date for a one-time event.");
+            return;
+        }
+        
+        if (isOneTime) {
+            frequency = 1; 
+            
+            // Set lastCompletedDate to be 1 day before the targetDueDate
+            const targetDate = createLocalDate(targetDueDate);
+            const initialLastCompleted = new Date(targetDate);
+            initialLastCompleted.setDate(targetDate.getDate() - 1);
+            lastCompletedDate = formatDate(initialLastCompleted);
 
-        if (!lastCompletedDate) {
+        } else if (!lastCompletedDate) {
+            // Standard recurring setup logic
             if (targetDueDate) {
                 const targetDate = createLocalDate(targetDueDate);
                 const initialLastCompleted = new Date(targetDate);
@@ -556,7 +634,8 @@ function registerFormListener() {
             frequencyDays: frequency,
             lastCompleted: lastCompletedDate, 
             completionHistory: initialHistory, 
-            id: taskData.length 
+            id: taskData.length,
+            isOneTime: isOneTime 
         };
         
         taskData.push(newTask);
