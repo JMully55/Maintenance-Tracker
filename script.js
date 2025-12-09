@@ -4,14 +4,20 @@ const STORAGE_KEY = 'maintenanceTrackerTasks';
 // --- Initialization ---
 function initTracker() {
     loadTasks();
-    taskData.forEach((t, i) => t.id = i);
+    // CRITICAL FIX: Ensure ALL loaded tasks have a unique, stable ID. 
+    // If IDs are missing (from initial load), assign one based on the current array index (i).
+    taskData.forEach((t, i) => {
+        if (typeof t.id === 'undefined') {
+            t.id = Date.now() + i; // Assign a high, unique ID
+        }
+    });
     setupCalendarControls();
     registerFormListener();
     toggleCustomFrequency(); 
     sortTable('dueDate');
 }
 
-// --- Utility & Date Helpers ---
+// --- Utility & Date Helpers (omitted for brevity) ---
 const getToday = () => new Date().setHours(0, 0, 0, 0);
 
 function formatDate(date) {
@@ -65,7 +71,7 @@ function loadTasks() {
 }
 function saveTasks() { localStorage.setItem(STORAGE_KEY, JSON.stringify(taskData)); }
 
-// --- Calendar Logic (FIXED) ---
+// --- Calendar Logic ---
 function setupCalendarControls() {
     const ms = document.getElementById('month-select'), ys = document.getElementById('year-select');
     const now = new Date();
@@ -435,6 +441,7 @@ function registerFormListener() {
         const initialHistory = [];
 
         taskData.push({
+            id: Date.now() + Math.floor(Math.random() * 1000), // Assign unique ID on creation
             taskName: document.getElementById('taskName').value,
             category: document.getElementById('category').value,
             description: document.getElementById('description').value,
