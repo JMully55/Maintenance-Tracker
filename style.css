@@ -237,7 +237,7 @@ tr:nth-child(even) { background-color: #fcfcfc; }
 .task-event.overdue { background-color: #a94442; }
 .empty-day { background-color: #f9f9f9; color: #ccc; }
 
-/* Modal Styles (Enforcing high Z-Index) */
+/* Modal Styles (CRITICAL Z-INDEX FIX) */
 .modal {
     display: none; 
     position: fixed; 
