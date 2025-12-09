@@ -254,13 +254,14 @@ function renderNotepads() {
 
         // 1. Check if due TODAY
         if (ds === todayS) {
-            dailyTasksCount++;
+            
             if (isCompletedToday) {
                 // Task is due today AND completed today -> Move to Completed List
                 dailyTasksCompletedCount++;
                 cl.innerHTML += itemTemplate(`markUndone`, '✔️');
             } else {
                 // Task is due today AND UNCOMPLETED -> Show in Today's List
+                dailyTasksCount++;
                 dl.innerHTML += itemTemplate(`markDone`, '◻️');
             }
         }
