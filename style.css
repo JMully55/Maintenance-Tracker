@@ -108,32 +108,28 @@ tr:nth-child(even) {
     margin-right: 5px;
 }
 
-/* 🏆 CORRECTED SIDE BUTTON STYLING 🏆 */
-#side-buttons {
-    /* Use fixed position relative to the viewport */
-    position: fixed;
-    top: 30%; /* Start lower down the page */
-    right: 20px; /* Position them 20px from the right edge */
-    z-index: 1000;
+/* 🏆 CORRECTED CONTROL BUTTON STYLING AND POSITIONING 🏆 */
+#control-buttons {
+    /* Use Flexbox to align buttons horizontally */
     display: flex;
-    flex-direction: column; /* Stack buttons vertically */
-    gap: 15px; /* Spacing between buttons */
-    /* Remove rotation and transform properties */
+    justify-content: center; /* Center the group of buttons */
+    gap: 20px; /* Space between the buttons */
+    margin: 20px 0 30px; /* Space above and below the button group */
+    padding: 10px;
 }
 
-#side-buttons button {
-    padding: 10px 15px;
-    font-size: 14px;
-    width: 200px; /* Give them a standard width for readability */
-    border-radius: 4px; /* Standard border radius */
+#control-buttons button {
+    /* Button appearance for inline placement */
+    padding: 10px 20px;
+    font-size: 16px; 
+    width: 250px; 
     box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-    font-weight: bold;
-    text-align: center;
     
-    /* Ensure colors apply correctly */
     background-color: #007bff; 
     color: white;
+    font-weight: bold;
 }
+
 #open-completed-modal {
     background-color: #28a745 !important; /* Green for Completed Goals */
 }
