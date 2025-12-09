@@ -213,24 +213,27 @@ function renderNotepads() {
         
         const isCompletedToday = t.lastCompleted === todayS;
         
-        // Items for Today's List (Uncompleted)
-        if (ds === todayS && !isCompletedToday) {
-            dailyTasksCount++;
-            const item = `<li><span class="notepad-checkbox" onclick="markDone(${i})">◻️</span>${t.taskName}</li>`;
-            dl.innerHTML += item;
-        } 
-        
-        // Items for Completed List (Completed Today)
-        if (isCompletedToday) {
-            dailyTasksCompletedCount++;
-            const item = `<li><span class="notepad-checkbox" onclick="markUndone(${i})">✔️</span>${t.taskName}</li>`;
-            cl.innerHTML += item;
-        }
+        // Item template (only show checkmark if completed today)
+        const itemTemplate = (action, symbol) => `<li><span class="notepad-checkbox" onclick="${action}">${symbol}</span>${t.taskName}</li>`;
 
-        // Items for Weekly List
+        // 🏆 NEW LOGIC FOR TASK POPULATION 🏆
+        
+        // 1. Check if due TODAY
+        if (ds === todayS) {
+            dailyTasksCount++;
+            if (isCompletedToday) {
+                // Task is due today AND completed today -> Move to Completed List
+                dailyTasksCompletedCount++;
+                cl.innerHTML += itemTemplate(`markUndone(${i})`, '✔️');
+            } else {
+                // Task is due today AND UNCOMPLETED -> Show in Today's List
+                dl.innerHTML += itemTemplate(`markDone(${i})`, '◻️');
+            }
+        }
+        
+        // 2. Items for Weekly List
         if (due >= start && due <= end) {
              weeklyTasksCount++;
-             // Use the same completed check as above (if completed today, show check)
              const item = `<li><span class="notepad-checkbox">${isCompletedToday?'✔️':'◻️'}</span>${t.taskName} (${ds})</li>`;
              wl.innerHTML += item;
         }
@@ -240,7 +243,8 @@ function renderNotepads() {
     if (dailyTasksCount === 0 && dailyTasksCompletedCount === 0) {
         dl.innerHTML = '<li>🎉 Nothing scheduled for today!</li>';
     } else if (dailyTasksCount === 0 && dailyTasksCompletedCount > 0) {
-         dl.innerHTML = '<li>✅ Today\'s tasks moved to Completed List.</li>';
+         // This means all due-today tasks were moved to the completed list.
+         dl.innerHTML = '<li>✅ All scheduled tasks are done!</li>';
     }
 
     if (cl.innerHTML === '') {
@@ -249,9 +253,6 @@ function renderNotepads() {
 
     if (weeklyTasksCount === 0) {
         wl.innerHTML = '<li>😌 Nothing scheduled for this week!</li>';
-    } else if (weeklyTasksCount > 0 && weeklyTasksCount === dailyTasksCompletedCount) {
-         // This condition is wrong: It should compare weekly completed count, not just daily. 
-         // Since we don't track true weekly completion, we will simply use the message above if the list is empty.
     }
 }
 
