@@ -14,7 +14,7 @@ function initTracker() {
     registerFormListener();
     toggleCustomFrequency(); 
     sortTable('dueDate');
-    renderCalendar(); // Explicitly ensure calendar renders
+    renderCalendar(); // Ensure calendar renders
 }
 
 // --- Utility & Date Helpers ---
@@ -74,7 +74,7 @@ function saveTasks() { localStorage.setItem(STORAGE_KEY, JSON.stringify(taskData
 // --- Calendar Logic ---
 function setupCalendarControls() {
     const ms = document.getElementById('month-select'), ys = document.getElementById('year-select');
-    if (!ms || !ys) return; // Guard clause
+    if (!ms || !ys) return; 
     const now = new Date();
     const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
     ms.innerHTML = months.map((m, i) => `<option value="${i}" ${i===now.getMonth()?'selected':''}>${m}</option>`).join('');
@@ -174,7 +174,7 @@ window.renderCalendar = function() {
     }
 };
 
-// --- Modal Functions (Working) ---
+// --- Modal Functions (omitted for brevity) ---
 window.openHistoryModal = () => { 
     const modal = document.getElementById('history-modal');
     if (modal) { modal.style.display = 'block'; renderHistoryModal(); }
@@ -456,5 +456,3 @@ function registerFormListener() {
         toggleCustomFrequency();
     };
 }
-
-
