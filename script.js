@@ -1,6 +1,14 @@
 let taskData = []; 
 const STORAGE_KEY = 'maintenanceTrackerTasks';
 
+// 🚨 DEBUGGING TOOL: Global Error Handler 🚨
+// This will pop up a box showing the exact line number and error message if JS fails.
+window.onerror = function(message, source, lineno, colno, error) {
+    alert(`CRITICAL JAVASCRIPT ERROR:\nMessage: ${message}\nLine: ${lineno}\nSource: ${source}`);
+    return true; // Prevents default browser error handling
+};
+
+
 // --- Initialization ---
 function initTracker() {
     loadTasks();
@@ -394,18 +402,23 @@ window.toggleCustomFrequency = () => {
     }
 };
 
+// 🚨 DEBUGGING TOOL: try/catch block added to catch errors in the toggle function
 window.toggleFormVisibility = function() {
-    const formContainer = document.getElementById('task-form-container');
-    const button = document.querySelector('#add-task-toggle button');
-    
-    if (formContainer && button) {
-        if (formContainer.style.display === 'none' || formContainer.style.display === '') {
-            formContainer.style.display = 'block';
-            button.textContent = '— Hide Task Input';
-        } else {
-            formContainer.style.display = 'none';
-            button.textContent = '+ Add New Task / Event';
+    try {
+        const formContainer = document.getElementById('task-form-container');
+        const button = document.querySelector('#add-task-toggle button');
+        
+        if (formContainer && button) {
+            if (formContainer.style.display === 'none' || formContainer.style.display === '') {
+                formContainer.style.display = 'block';
+                button.textContent = '— Hide Task Input';
+            } else {
+                formContainer.style.display = 'none';
+                button.textContent = '+ Add New Task / Event';
+            }
         }
+    } catch (e) {
+        console.error("Error in toggleFormVisibility:", e);
     }
 }
 
