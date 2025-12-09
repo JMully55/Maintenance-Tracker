@@ -126,7 +126,7 @@ function getRecurringDueDates(task, mStart, mEnd) {
 
 window.renderCalendar = function() {
     const view = document.getElementById('calendar-view');
-    if (!view) return; // Guard clause for calendar element
+    if (!view) return; 
     
     view.innerHTML = '';
     const m = parseInt(document.getElementById('month-select').value);
@@ -229,7 +229,11 @@ function renderNotepads() {
     if (!dl || !wl || !cl) return; // Guard against missing notepad elements
     
     dl.innerHTML = ''; wl.innerHTML = ''; cl.innerHTML = '';
-    const now = new Date(); document.querySelector('h3').textContent = `Today's Tasks (${formatDate(now)})`;
+    const now = new Date(); 
+    // Ensure the h3 element exists before setting text
+    const dailyH3 = document.querySelector('#focus-notepads-row1 .daily-focus h3');
+    if (dailyH3) dailyH3.textContent = `Today's Tasks (${formatDate(now)})`;
+    
     const todayS = formatDate(now), start = new Date(now), end = new Date(start); 
     start.setDate(now.getDate() - now.getDay()); start.setHours(0,0,0,0); 
     end.setDate(start.getDate() + 6); end.setHours(23,59,59,999);
@@ -247,7 +251,7 @@ function renderNotepads() {
         
         const itemTemplate = (action, symbol) => `<li><span class="notepad-checkbox" onclick="${action}">${symbol}</span>${t.taskName}</li>`;
 
-        // 1. Due TODAY
+        // 1. Check if due TODAY
         if (ds === todayS) {
             dailyTasksCount++;
             if (isCompletedToday) {
@@ -272,6 +276,7 @@ function renderNotepads() {
     if (dailyTasksCount === 0 && dailyTasksCompletedCount === 0) {
         dl.innerHTML = '<li>🎉 Nothing scheduled for today!</li>';
     } else if (dailyTasksCount === 0 && dailyTasksCompletedCount > 0) {
+         // This means all due-today tasks were moved to the completed list.
          dl.innerHTML = '<li>✅ All scheduled tasks are done!</li>';
     }
 
