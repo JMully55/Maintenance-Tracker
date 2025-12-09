@@ -1,6 +1,5 @@
 let taskData = []; 
 const STORAGE_KEY = 'maintenanceTrackerTasks';
-const VISUAL_KEY = 'notepadVisualState'; // New key for session-only visual state
 
 // --- Initialization ---
 function initTracker() {
@@ -12,13 +11,46 @@ function initTracker() {
     sortTable('dueDate');
 }
 
-// --- Utility & Date Helpers (omitted for brevity) ---
+// --- Utility & Date Helpers ---
 const getToday = () => new Date().setHours(0, 0, 0, 0);
-function formatDate(date) { /* ... */ }
-function formatTimestamp(isoString) { /* ... */ }
-function createLocalDate(dateString) { /* ... */ }
-function calculateDueDate(lastComp, freqDays, isOneTime) { /* ... */ }
-function getStatus(dueDate) { /* ... */ }
+
+function formatDate(date) {
+    const d = new Date(date);
+    let m = '' + (d.getMonth() + 1), day = '' + d.getDate(), y = d.getFullYear();
+    if (m.length < 2) m = '0' + m;
+    if (day.length < 2) day = '0' + day;
+    return [y, m, day].join('-');
+}
+
+function formatTimestamp(isoString) {
+    const date = new Date(isoString);
+    return `${date.toLocaleDateString()} ${date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+}
+
+function createLocalDate(dateString) {
+    const parts = dateString.split('-').map(p => parseInt(p, 10));
+    return new Date(parts[0], parts[1] - 1, parts[2]);
+}
+
+function calculateDueDate(lastComp, freqDays, isOneTime) {
+    if (isOneTime && freqDays === 0) return null;
+    if (!lastComp) return null;
+    const lastDate = createLocalDate(lastComp);
+    const nextDate = new Date(lastDate);
+    const frequency = parseInt(freqDays);
+    if (isNaN(frequency)) return null;
+
+    nextDate.setDate(lastDate.getDate() + frequency);
+    return nextDate;
+}
+
+function getStatus(dueDate) {
+    if (!dueDate) return { text: 'N/A', class: '', sortValue: 1000 };
+    const diff = Math.ceil((dueDate.setHours(0,0,0,0) - getToday()) / 86400000);
+    if (diff < 0) return { text: `OVERDUE (${Math.abs(diff)}d)`, class: 'status-overdue', sortValue: diff };
+    if (diff <= 30) return { text: `DUE IN ${diff}d`, class: 'status-due', sortValue: diff };
+    return { text: 'Upcoming', class: '', sortValue: diff };
+}
 
 // --- Persistence ---
 function loadTasks() {
@@ -33,27 +65,133 @@ function loadTasks() {
 }
 function saveTasks() { localStorage.setItem(STORAGE_KEY, JSON.stringify(taskData)); }
 
-// --- Visual State Persistence (NEW) ---
-function loadVisualState() {
-    // Loads the visual state array, which resets if the day changes or session ends
-    const state = sessionStorage.getItem(VISUAL_KEY);
-    return state ? JSON.parse(state) : [];
-}
-function saveVisualState(state) {
-    sessionStorage.setItem(VISUAL_KEY, JSON.stringify(state));
+// --- Calendar Logic ---
+function setupCalendarControls() {
+    const ms = document.getElementById('month-select'), ys = document.getElementById('year-select');
+    const now = new Date();
+    const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+    ms.innerHTML = months.map((m, i) => `<option value="${i}" ${i===now.getMonth()?'selected':''}>${m}</option>`).join('');
+    for (let y = now.getFullYear() - 2; y <= now.getFullYear() + 5; y++) {
+        const op = document.createElement('option'); op.value = y; op.text = y;
+        if (y === now.getFullYear()) op.selected = true;
+        ys.appendChild(op);
+    }
 }
 
-// --- Calendar & Modal Functions (omitted for brevity) ---
-function setupCalendarControls() { /* ... */ }
-function getRecurringDueDates(task, mStart, mEnd) { /* ... */ }
-window.renderCalendar = function() { /* ... */ };
-window.openHistoryModal = () => { /* ... */ };
-window.closeHistoryModal = () => { /* ... */ };
-window.openCompletedModal = () => { /* ... */ };
-window.closeCompletedModal = () => { /* ... */ };
-window.onclick = (event) => { /* ... */ };
-function renderHistoryModal() { /* ... */ }
-function renderCompletedModal() { /* ... */ }
+function getRecurringDueDates(task, mStart, mEnd) {
+    const events = {};
+    if (task.isOneTime && task.frequencyDays === 0) return events;
+    if (!task.lastCompleted) return events;
+    
+    const frequency = parseInt(task.frequencyDays);
+    if (isNaN(frequency) || frequency <= 0) {
+        if(task.isOneTime && frequency === 1) {
+            const nextDueDate = calculateDueDate(task.lastCompleted, 1, true);
+            if (nextDueDate >= mStart && nextDueDate <= mEnd) {
+                 events[formatDate(nextDueDate)] = { name: `${task.taskName} (1-Time)`, overdue: nextDueDate.getTime() < getToday() };
+            }
+            return events;
+        }
+        return events;
+    }
+
+    let currentDate = calculateDueDate(task.lastCompleted, frequency, task.isOneTime);
+    
+    if (!currentDate) return events;
+    currentDate.setHours(0, 0, 0, 0); 
+    
+    if (currentDate.getTime() < mStart.getTime() && !task.isOneTime) {
+        const daysDiff = Math.ceil((mStart.getTime() - currentDate.getTime()) / 86400000);
+        const cyclesToSkip = Math.ceil(daysDiff / frequency);
+        currentDate.setDate(currentDate.getDate() + cyclesToSkip * frequency);
+    }
+    
+    while (currentDate.getTime() <= mEnd.getTime()) {
+        
+        if (currentDate.getTime() >= mStart.getTime()) {
+            const dateString = formatDate(currentDate);
+            events[dateString] = { 
+                name: task.taskName + (task.isOneTime ? ' (1-Time)':''), 
+                overdue: currentDate.getTime() < getToday() 
+            };
+        }
+
+        if (task.isOneTime) break;
+        
+        currentDate.setDate(currentDate.getDate() + frequency);
+    }
+    return events;
+}
+
+
+window.renderCalendar = function() {
+    const view = document.getElementById('calendar-view');
+    view.innerHTML = '';
+    const m = parseInt(document.getElementById('month-select').value);
+    const y = parseInt(document.getElementById('year-select').value);
+    const start = new Date(y, m, 1);
+    
+    start.setDate(start.getDate() - start.getDay());
+    start.setHours(0, 0, 0, 0); 
+
+    const end = new Date(start); end.setDate(end.getDate() + 42);
+    end.setHours(0, 0, 0, 0); 
+
+    const allEvents = {};
+    taskData.forEach(t => {
+        const evs = getRecurringDueDates(t, start, end);
+        for (let d in evs) { if (!allEvents[d]) allEvents[d = []]; allEvents[d].push(evs[d]); }
+    });
+
+    ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].forEach(d => {
+        const h = document.createElement('div'); h.className='calendar-header'; h.innerText=d; view.appendChild(h);
+    });
+
+    let curr = new Date(start);
+    for (let i=0; i<42; i++) {
+        const ds = formatDate(curr);
+        const dDiv = document.createElement('div'); 
+        dDiv.className='calendar-day' + (curr.getMonth()!==m?' empty-day':'');
+        dDiv.innerHTML = `<strong>${curr.getDate()}</strong>`;
+        
+        if (allEvents[ds]) {
+            allEvents[ds].forEach(e => {
+                const eDiv = document.createElement('div'); eDiv.className='task-event' + (e.overdue?' overdue':'');
+                eDiv.innerText = e.name; dDiv.appendChild(eDiv);
+            });
+        }
+        view.appendChild(dDiv);
+        curr.setDate(curr.getDate()+1);
+    }
+};
+
+// --- Modal Functions (omitted for brevity) ---
+window.openHistoryModal = () => { document.getElementById('history-modal').style.display='block'; renderHistoryModal(); };
+window.closeHistoryModal = () => { document.getElementById('history-modal').style.display='none'; };
+window.openCompletedModal = () => { document.getElementById('completed-modal').style.display='block'; document.getElementById('completed-search').value = ''; renderCompletedModal(); };
+window.closeCompletedModal = () => { document.getElementById('completed-modal').style.display='none'; };
+window.onclick = (event) => { const modalH = document.getElementById('history-modal'), modalC = document.getElementById('completed-modal'); if (event.target === modalH) closeHistoryModal(); if (event.target === modalC) closeCompletedModal(); };
+
+function renderHistoryModal() {
+    const list = document.getElementById('history-list'); list.innerHTML = '';
+    taskData.forEach((t, i) => {
+        if (t.isOneTime && t.frequencyDays === 0) return;
+        const row = document.createElement('tr');
+        row.innerHTML = `<td>${t.lastCompleted}</td><td>${t.taskName}</td><td>${t.category}</td><td>${t.frequencyDays}d</td><td>${t.description}</td><td><button class="delete-button-history" onclick="deleteTask(${i})">Delete</button></td>`;
+        list.appendChild(row);
+    });
+}
+function renderCompletedModal() {
+    const list = document.getElementById('completed-list'); list.innerHTML = '';
+    const q = document.getElementById('completed-search').value.toLowerCase();
+    let history = [];
+    taskData.forEach(t => t.completionHistory.forEach(h => {
+        if (t.taskName.toLowerCase().includes(q) || t.category.toLowerCase().includes(q)) history.push({ name: t.taskName, cat: t.category, time: h.timestamp });
+    }));
+    history.sort((a,b) => new Date(b.time) - new Date(a.time)).forEach(h => {
+        list.innerHTML += `<tr><td>${formatTimestamp(h.time)}</td><td>${h.name}</td><td>${h.cat}</td></tr>`;
+    });
+}
 
 // --- Dashboard ---
 function renderNotepads() {
@@ -63,38 +201,21 @@ function renderNotepads() {
     const todayS = formatDate(now), start = new Date(now), end = new Date(start); 
     start.setDate(now.getDate() - now.getDay()); start.setHours(0,0,0,0); 
     end.setDate(start.getDate() + 6); end.setHours(23,59,59,999);
-    
-    const visualState = loadVisualState(); // Load session-only visual checkmarks
 
     taskData.forEach((t, i) => {
         const due = calculateDueDate(t.lastCompleted, t.frequencyDays, t.isOneTime);
         if (!due || (t.isOneTime && t.frequencyDays === 0)) return;
         const ds = formatDate(due);
         
-        // Check if task is visually checked in THIS session
-        const isVisuallyChecked = visualState.includes(t.id);
+        // Check if task was completed TODAY
+        const isCompletedToday = t.lastCompleted === todayS;
         
-        // We still use the *actual* lastCompleted date for the table/DB completion
-        const isCompletedTodayByDB = t.lastCompleted === todayS; 
+        // CHECKMARK TOGGLE FIX: Correctly call markDone or markUndone
+        const item = `<li><span class="notepad-checkbox" onclick="${isCompletedToday ? `markUndone(${i})` : `markDone(${i})`}">${isCompletedToday?'✔️':'◻️'}</span>${t.taskName}</li>`;
         
-        // 🏆 NEW LOGIC: Toggles the VISUAL state using the session ID, but only triggers DB update if due TODAY.
-        const completionAction = `toggleVisualDone(${t.id}, '${ds}')`; // Pass task ID and due date
-
-        const item = `<li><span class="notepad-checkbox" onclick="${completionAction}">${isVisuallyChecked?'✔️':'◻️'}</span>${t.taskName}</li>`;
-        
-        // DAILY TASKS
-        if (ds === todayS) {
-            dl.innerHTML += item;
-        }
-
-        // WEEKLY TASKS (Shows up with checkmark if done in session or if due today/later this week)
-        if (due >= start && due <= end) {
-            wl.innerHTML += item;
-        }
+        if (ds === todayS) dl.innerHTML += item;
+        if (due >= start && due <= end) wl.innerHTML += item;
     });
-
-    if (!dl.innerHTML) { dl.innerHTML = '<li>🎉 No tasks due today!</li>'; }
-    if (!wl.innerHTML) { wl.innerHTML = '<li>😌 No tasks due this week!</li>'; }
 }
 
 function renderDashboard() {
@@ -113,50 +234,13 @@ function renderDashboard() {
     renderCalendar(); renderNotepads(); saveTasks();
 }
 
-// --- Actions (MODIFIED) ---
-
-// 🏆 NEW: Handles the visual toggle and conditionally triggers markDone
-window.toggleVisualDone = (taskId, dueDateStr) => {
-    const todayS = formatDate(new Date());
-    const visualState = loadVisualState();
-    const taskIndex = visualState.indexOf(taskId);
-
-    if (taskIndex === -1) {
-        // If UNCHECKED, mark visually checked
-        visualState.push(taskId);
-
-        // If the task is due TODAY, trigger the full database completion.
-        if (dueDateStr === todayS) {
-            markDone(taskId);
-        }
-    } else {
-        // If CHECKED, remove visual checkmark
-        visualState.splice(taskIndex, 1);
-        
-        // If the task was due TODAY, reverse the database completion.
-        if (dueDateStr === todayS) {
-            markUndone(taskId);
-        }
-    }
-    
-    saveVisualState(visualState);
-    renderDashboard(); // Rerender to show the new checkmark status
-};
-
-
+// --- Actions ---
 window.markDone = (idx) => {
-    const t = taskData.find(t => t.id === idx);
+    const t = taskData[idx];
     const now = new Date();
     const todayFormatted = formatDate(now);
 
-    if (!t || t.lastCompleted === todayFormatted) return; 
-    
-    // Check if the task is currently checked visually, if not, check it visually first.
-    const visualState = loadVisualState();
-    if (!visualState.includes(t.id)) {
-        visualState.push(t.id);
-        saveVisualState(visualState);
-    }
+    if (t.lastCompleted === todayFormatted) return; 
     
     t.completionHistory.push({ timestamp: now.toISOString(), dateOnly: todayFormatted });
     t.lastCompleted = todayFormatted;
@@ -167,12 +251,10 @@ window.markDone = (idx) => {
 };
 
 window.markUndone = (idx) => {
-    const t = taskData.find(t => t.id === idx);
+    const t = taskData[idx];
     const todayFormatted = formatDate(new Date());
 
-    if (!t) return;
-    
-    // 1. Remove today's completion entry from the DB
+    // 1. Remove today's completion entry
     const historyIndex = t.completionHistory.findIndex(h => h.dateOnly === todayFormatted);
     if (historyIndex > -1) {
         t.completionHistory.splice(historyIndex, 1);
@@ -195,9 +277,21 @@ window.markUndone = (idx) => {
 };
 
 
-window.skipTask = (idx) => { /* ... */ };
-window.deleteTask = (idx) => { /* ... */ };
-window.sortTable = (key, modal=false) => { /* ... */ };
+window.skipTask = (idx) => {
+    const t = taskData[idx];
+    const due = calculateDueDate(t.lastCompleted, t.frequencyDays, false);
+    t.lastCompleted = formatDate(due);
+    renderDashboard();
+};
+
+window.deleteTask = (idx) => {
+    if (confirm("Permanently delete this task?")) { taskData.splice(idx, 1); renderDashboard(); }
+};
+
+window.sortTable = (key, modal=false) => {
+    taskData.sort((a,b) => (a[key] > b[key] ? 1 : -1));
+    modal ? renderHistoryModal() : renderDashboard();
+};
 
 window.toggleCustomFrequency = () => {
     document.getElementById('customFrequencyDiv').style.display = document.getElementById('frequencySelect').value === 'custom' ? 'block' : 'none';
@@ -217,5 +311,52 @@ window.toggleFormVisibility = function() {
 }
 
 
-// --- Form Handling ---
-function registerFormListener() { /* ... */ }
+// --- Form Handling (UPDATED LOGIC) ---
+function registerFormListener() {
+    document.getElementById('task-form').onsubmit = (e) => {
+        e.preventDefault();
+        const fv = document.getElementById('frequencySelect').value;
+        const oneTime = fv === 'single';
+        let freq = oneTime ? 1 : (fv === 'custom' ? parseInt(document.getElementById('customDays').value) : parseInt(fv));
+        const inputDate = document.getElementById('dateInput').value; // Combined input
+
+        let lastCompletedDate = '';
+
+        if (isNaN(freq) || freq <= 0) {
+            alert("Please enter a valid positive number for Frequency or select a standard interval.");
+            return;
+        }
+        if (!inputDate) {
+            alert("Please enter a Date.");
+            return;
+        }
+
+        const targetDate = createLocalDate(inputDate);
+        const initialLastCompleted = new Date(targetDate);
+            
+        initialLastCompleted.setDate(targetDate.getDate() - freq);
+        lastCompletedDate = formatDate(initialLastCompleted);
+        
+        // Prepare initial history
+        const initialHistory = [];
+        if (lastCompletedDate) {
+             initialHistory.push({
+                timestamp: new Date(lastCompletedDate).toISOString(),
+                dateOnly: lastCompletedDate
+            });
+        }
+
+        taskData.push({
+            taskName: document.getElementById('taskName').value,
+            category: document.getElementById('category').value,
+            description: document.getElementById('description').value,
+            frequencyDays: freq, 
+            lastCompleted: lastCompletedDate, 
+            isOneTime: oneTime, 
+            completionHistory: initialHistory 
+        });
+        renderDashboard(); 
+        e.target.reset(); 
+        toggleCustomFrequency();
+    };
+}
