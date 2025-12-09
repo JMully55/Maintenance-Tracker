@@ -1,14 +1,14 @@
 /* General Layout */
 body {
     /* Set body background to a neutral color */
-    background-color: #e8eebf; 
+    background-color: #f0f0e0; /* Light beige background behind the paper */
     margin: 0; /* Remove default body margin */
     font-family: 'Arial', sans-serif;
     padding-bottom: 50px; /* Space at the bottom */
 }
 
 .container {
-    max-width: 900px; /* Reduced width to make the paper look more like a sheet */
+    max-width: 900px; /* Standard A4 size feel */
     margin: 50px auto; /* Margin top/bottom, auto center */
     padding: 40px; 
     
@@ -16,14 +16,14 @@ body {
     background: 
         /* Horizontal blue lines (simulated) */
         linear-gradient(to bottom, transparent 39px, #75aadb 40px) 0 0 / 100% 40px,
-        /* Vertical pink margin line (simulated) */
-        linear-gradient(to right, #ffc0cb 1px, transparent 1px) 80px 0 / 1px 100%,
+        /* Vertical pink margin line (now blue) */
+        linear-gradient(to right, #a0d0ff 1px, transparent 1px) 80px 0 / 1px 100%,
         /* Base paper color */
         #ffffff;
 
-    background-attachment: local; /* Ensures background scrolls with content */
+    background-attachment: local; 
     
-    border: 1px solid #c0c0c0; /* Light border */
+    border: 1px solid #c0c0c0; 
     border-radius: 4px;
     box-shadow: 5px 5px 15px rgba(0,0,0,0.3); /* Strong shadow for depth */
     
@@ -31,17 +31,17 @@ body {
     padding-left: 95px; 
     padding-top: 50px;
     padding-right: 40px;
-    position: relative; /* Needed for the tacks */
+    position: relative; 
 }
 
 h1 {
-    font-family: 'Comic Sans MS', cursive, sans-serif; /* Playful font */
+    font-family: 'Comic Sans MS', cursive, sans-serif; 
     color: #4a4a4a;
     text-align: center;
     margin-top: 0;
     margin-bottom: 30px;
     text-shadow: 1px 1px 0 #fff;
-    border-bottom: 3px dashed #75aadb; /* Dashed line under header */
+    border-bottom: 3px dashed #75aadb; 
     padding-bottom: 10px;
 }
 
@@ -51,36 +51,42 @@ h2 {
     text-align: center;
 }
 
-/* Tacks (Implemented using pseudo-elements on the container) */
+/* 📌 REALISTIC TACKS 📌 */
 .container:before,
 .container:after {
     content: '';
     position: absolute;
-    width: 25px;
-    height: 25px;
-    background-color: #d9534f; /* Red tack color */
+    width: 18px;
+    height: 18px;
     border-radius: 50%;
-    box-shadow: 1px 1px 3px rgba(0,0,0,0.5) inset;
     z-index: 10;
+    
+    /* Realistic Red/Pink Tack Styling */
+    background: radial-gradient(circle at 35% 35%, #ff8a8a, #d9534f);
+    border: 1px solid rgba(0,0,0,0.2);
+    box-shadow: 
+        0 1px 2px rgba(0,0,0,0.5), /* Outer shadow for tack depth */
+        inset 0 1px 1px rgba(255,255,255,0.7); /* Inner highlight */
 }
+
 /* Top Left Tack */
 .container:before {
-    top: -12px;
-    left: -12px;
+    top: -9px; /* Half the size of the tack */
+    left: -9px;
 }
 /* Top Right Tack */
 .container:after {
-    top: -12px;
-    right: -12px;
+    top: -9px;
+    right: -9px;
 }
 
 
-/* Form Styling (Update input/select to match paper vibe) */
+/* Form Styling */
 form {
-    background-color: transparent; /* Make form transparent */
-    border: 1px dashed #c0c0c0; /* Dashed border */
+    background-color: transparent; 
+    border: 1px dashed #c0c0c0; 
     padding: 15px;
-    box-shadow: none; /* Remove form shadow */
+    box-shadow: none; 
     grid-template-columns: repeat(3, 1fr);
     gap: 10px;
     margin-bottom: 20px;
@@ -95,10 +101,10 @@ form input, form select, form textarea {
     border: 1px solid #ccc;
     border-radius: 3px;
     box-shadow: none;
-    background-color: #f8f8f8; /* Slightly off-white input */
+    background-color: #f8f8f8; 
 }
 form button[type="submit"] {
-    background-color: #ffb84d; /* Brighter, playful orange button */
+    background-color: #ffb84d; 
     color: #4a4a4a;
     border: 2px solid #e09f3e;
     text-shadow: 1px 1px 0 #fff;
@@ -106,14 +112,13 @@ form button[type="submit"] {
 }
 
 
-/* Focus Notepads (Sticky Notes - No Change Needed, they already look fun) */
+/* Focus Notepads (Sticky Notes) */
 #focus-notepads {
     display: flex;
     justify-content: space-around;
     gap: 20px;
     margin-bottom: 30px;
 }
-
 .notepad {
     flex: 1;
     min-height: 180px;
@@ -122,7 +127,14 @@ form button[type="submit"] {
     box-shadow: 2px 2px 8px rgba(0, 0, 0, 0.15);
     font-family: 'Georgia', serif;
 }
-/* ... (Rest of .daily-focus, .weekly-focus, .notepad h3, etc., remains the same) ... */
+.daily-focus { background-color: #fffd8b; transform: rotate(-1deg); }
+.weekly-focus { background-color: #b3e5fc; transform: rotate(1deg); }
+.notepad h3 { margin-top: 0; border-bottom: 1px solid rgba(0,0,0,0.1); }
+.notepad ul { list-style: none; padding: 0; }
+.notepad li { padding: 5px 0; display: flex; align-items: center; border-bottom: 1px dotted rgba(0,0,0,0.05); }
+.notepad-checkbox { cursor: pointer; margin-right: 10px; font-size: 1.2em; }
+.completed-task-note { text-decoration: line-through; color: #777; }
+
 
 /* Control Button Positioning (Side-by-side) */
 #control-buttons {
@@ -138,26 +150,50 @@ form button[type="submit"] {
     font-size: 16px; 
     width: 250px; 
     box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-    background-color: #4d94ff; /* Playful blue */
+    background-color: #4d94ff; 
     color: white;
     font-weight: bold;
     border: 2px solid #3d7ddf;
 }
 
 #open-completed-modal {
-    background-color: #5cb85c !important; /* Playful green */
+    background-color: #5cb85c !important; 
     border: 2px solid #4cae4c;
 }
 
-/* Table Styling (Ensure colors look good against white/lined background) */
+/* Table Styling */
 table {
-    box-shadow: 0 2px 5px rgba(0,0,0,0.1); /* Add subtle shadow to tables */
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
     background-color: #fafafa;
 }
 th { 
-    background-color: #ffb84d; /* Use orange header */
+    background-color: #ffb84d; 
     color: #4a4a4a;
     border-bottom: 3px solid #e09f3e;
 }
 tr:nth-child(even) { background-color: #fcfcfc; }
-/* ... (Rest of status colors and modal styles remain the same) ... */
+
+/* Calendar Grid */
+#calendar-view {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 1px;
+    background-color: #ddd;
+    border: 1px solid #ccc;
+}
+.calendar-day { background-color: #fff; padding: 8px; min-height: 90px; }
+.calendar-header { background-color: #ffb84d; color: #4a4a4a; text-align: center; padding: 5px; font-weight: bold; }
+.task-event { background-color: #5cb85c; color: white; padding: 2px 4px; margin-bottom: 2px; border-radius: 3px; font-size: 0.75em; }
+.task-event.overdue { background-color: #a94442; }
+.empty-day { background-color: #f9f9f9; color: #ccc; }
+
+/* Modal Styles (no change) */
+.modal {
+    display: none; position: fixed; z-index: 1001; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.4); 
+}
+.modal-content {
+    background-color: #fefefe; margin: 5% auto; padding: 20px; width: 90%; max-width: 1100px; border-radius: 8px; box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+}
+.close { color: #aaa; float: right; font-size: 28px; font-weight: bold; cursor: pointer; }
+.close:hover { color: black; }
+#completed-search { width: 100%; padding: 10px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; }
