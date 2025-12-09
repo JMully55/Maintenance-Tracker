@@ -1,8 +1,17 @@
 let taskData = []; 
 const STORAGE_KEY = 'maintenanceTrackerTasks';
 
-// --- Utility Functions ---
+// --- Initialization ---
+function initTracker() {
+    loadTasks();
+    taskData.forEach((t, i) => t.id = i);
+    setupCalendarControls();
+    registerFormListener();
+    toggleCustomFrequency(); 
+    sortTable('dueDate');
+}
 
+// --- Utility & Date Helpers ---
 const getToday = () => new Date().setHours(0, 0, 0, 0);
 
 function formatDate(date) {
@@ -23,12 +32,15 @@ function createLocalDate(dateString) {
     return new Date(parts[0], parts[1] - 1, parts[2]);
 }
 
-function calculateDueDate(lastCompletedDate, frequencyDays, isOneTime) {
-    if (isOneTime && frequencyDays === 0) return null;
-    if (!lastCompletedDate) return null;
-    const lastDate = createLocalDate(lastCompletedDate);
+function calculateDueDate(lastComp, freqDays, isOneTime) {
+    if (isOneTime && freqDays === 0) return null;
+    if (!lastComp) return null;
+    const lastDate = createLocalDate(lastComp);
     const nextDate = new Date(lastDate);
-    nextDate.setDate(lastDate.getDate() + parseInt(frequencyDays));
+    const frequency = parseInt(freqDays);
+    if (isNaN(frequency)) return null;
+
+    nextDate.setDate(lastDate.getDate() + frequency);
     return nextDate;
 }
 
@@ -40,7 +52,7 @@ function getStatus(dueDate) {
     return { text: 'Upcoming', class: '', sortValue: diff };
 }
 
-// --- Persistence ---
+// --- Storage ---
 function loadTasks() {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored) {
@@ -53,9 +65,7 @@ function loadTasks() {
 }
 function saveTasks() { localStorage.setItem(STORAGE_KEY, JSON.stringify(taskData)); }
 
-
-// --- Calendar Logic (FIXED RECURRENCE) ---
-
+// --- Calendar Logic ---
 function setupCalendarControls() {
     const ms = document.getElementById('month-select'), ys = document.getElementById('year-select');
     const now = new Date();
@@ -74,22 +84,28 @@ function getRecurringDueDates(task, mStart, mEnd) {
     if (!task.lastCompleted) return events;
     
     const frequency = parseInt(task.frequencyDays);
-    if (isNaN(frequency) || frequency <= 0) return events;
+    if (isNaN(frequency) || frequency <= 0) {
+        if(task.isOneTime && frequency === 1) {
+            const nextDueDate = calculateDueDate(task.lastCompleted, 1, true);
+            if (nextDueDate >= mStart && nextDueDate <= mEnd) {
+                 events[formatDate(nextDueDate)] = { name: `${task.taskName} (1-Time)`, overdue: nextDueDate.getTime() < getToday() };
+            }
+            return events;
+        }
+        return events;
+    }
 
     let currentDate = calculateDueDate(task.lastCompleted, frequency, task.isOneTime);
     
     if (!currentDate) return events;
     currentDate.setHours(0, 0, 0, 0); 
     
-    // Safety check to start the loop at an appropriate date
     if (currentDate.getTime() < mStart.getTime() && !task.isOneTime) {
-        // Calculate the next recurrence date that is >= mStart
         const daysDiff = Math.ceil((mStart.getTime() - currentDate.getTime()) / 86400000);
         const cyclesToSkip = Math.ceil(daysDiff / frequency);
         currentDate.setDate(currentDate.getDate() + cyclesToSkip * frequency);
     }
     
-    // Loop through all recurring dates within the view
     while (currentDate.getTime() <= mEnd.getTime()) {
         
         if (currentDate.getTime() >= mStart.getTime()) {
@@ -100,7 +116,6 @@ function getRecurringDueDates(task, mStart, mEnd) {
             };
         }
 
-        // Stop recurrence if it's a one-time event
         if (task.isOneTime) break;
         
         currentDate.setDate(currentDate.getDate() + frequency);
@@ -116,7 +131,6 @@ window.renderCalendar = function() {
     const y = parseInt(document.getElementById('year-select').value);
     const start = new Date(y, m, 1);
     
-    // Calculate calendar grid start (Sunday of the first week)
     start.setDate(start.getDate() - start.getDay());
     start.setHours(0, 0, 0, 0); 
 
@@ -129,7 +143,6 @@ window.renderCalendar = function() {
         for (let d in evs) { if (!allEvents[d]) allEvents[d] = []; allEvents[d].push(evs[d]); }
     });
 
-    // Render Headers
     ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].forEach(d => {
         const h = document.createElement('div'); h.className='calendar-header'; h.innerText=d; view.appendChild(h);
     });
@@ -141,7 +154,6 @@ window.renderCalendar = function() {
         dDiv.className='calendar-day' + (curr.getMonth()!==m?' empty-day':'');
         dDiv.innerHTML = `<strong>${curr.getDate()}</strong>`;
         
-        // Add events
         if (allEvents[ds]) {
             allEvents[ds].forEach(e => {
                 const eDiv = document.createElement('div'); eDiv.className='task-event' + (e.overdue?' overdue':'');
@@ -153,15 +165,13 @@ window.renderCalendar = function() {
     }
 };
 
-// --- Modal Functions (omitted for brevity, assume correct) ---
+// --- Modal Functions ---
 window.openHistoryModal = () => { document.getElementById('history-modal').style.display='block'; renderHistoryModal(); };
 window.closeHistoryModal = () => { document.getElementById('history-modal').style.display='none'; };
-window.openCompletedModal = () => { document.getElementById('completed-modal').style.display='block'; renderCompletedModal(); };
+window.openCompletedModal = () => { document.getElementById('completed-modal').style.display='block'; document.getElementById('completed-search').value = ''; renderCompletedModal(); };
 window.closeCompletedModal = () => { document.getElementById('completed-modal').style.display='none'; };
-window.onclick = (event) => { /* ... */ };
+window.onclick = (event) => { const modalH = document.getElementById('history-modal'), modalC = document.getElementById('completed-modal'); if (event.target === modalH) closeHistoryModal(); if (event.target === modalC) closeCompletedModal(); };
 
-
-// --- Rendering and Sorting ---
 function renderHistoryModal() {
     const list = document.getElementById('history-list'); list.innerHTML = '';
     taskData.forEach((t, i) => {
@@ -183,6 +193,7 @@ function renderCompletedModal() {
     });
 }
 
+// --- Dashboard ---
 function renderNotepads() {
     const dl = document.getElementById('daily-tasks-list'), wl = document.getElementById('weekly-tasks-list');
     dl.innerHTML = ''; wl.innerHTML = '';
@@ -246,7 +257,6 @@ window.sortTable = (key, modal=false) => {
 window.toggleCustomFrequency = () => {
     document.getElementById('customFrequencyDiv').style.display = document.getElementById('frequencySelect').value === 'custom' ? 'block' : 'none';
 };
-
 
 // --- Form Handling ---
 function registerFormListener() {
