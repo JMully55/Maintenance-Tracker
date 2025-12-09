@@ -27,23 +27,34 @@
                 </select>
             </div>
             <div>
-                <label for="frequencyDays">Frequency (Days):</label>
-                <input type="number" id="frequencyDays" min="1" required>
+                <label for="frequencySelect">Frequency:</label>
+                <select id="frequencySelect" onchange="toggleCustomFrequency()">
+                    <option value="single">Single Event</option>
+                    <option value="7" selected>Weekly</option>
+                    <option value="14">Bi-Weekly</option>
+                    <option value="30">Monthly</                    option>
+                    <option value="91">Quarterly</option>
+                    <option value="365">Yearly</option>
+                    <option value="custom">Custom (Days)</option>
+                </select>
             </div>
-            <div style="grid-column: 1 / 2; display: flex; align-items: center; gap: 10px;">
-                <input type="checkbox" id="oneTimeEvent" style="width: auto; margin-right: 0;">
-                <label for="oneTimeEvent" style="margin-bottom: 0; font-weight: normal;">One-Time Event (Ignores Frequency)</label>
-            </div>
+            
             <div style="grid-column: 1 / 3;">
                 <label for="description">Description:</label>
                 <textarea id="description" rows="2"></textarea>
             </div>
+            
+            <div id="customFrequencyDiv" style="display: none;">
+                <label for="customDays">Custom Days:</label>
+                <input type="number" id="customDays" min="1">
+            </div>
+            
             <div>
                 <label for="lastCompleted">Last Completed Date (If done previously):</label>
                 <input type="date" id="lastCompleted"> 
             </div>
             <div>
-                <label for="targetDueDate">OR Target Next Due Date (Required for one-time event):</label>
+                <label for="targetDueDate">OR Target Next Due Date (Required for single event/new task):</label>
                 <input type="date" id="targetDueDate"> 
             </div>
             <button type="submit" style="grid-column: 1 / -1;">Add Task</button>
@@ -51,58 +62,58 @@
 
         ---
 
-        <div id="control-buttons">
-            <button id="open-history-modal" onclick="openHistoryModal()">View All Tasks & History</button> 
-            <button id="open-completed-modal" onclick="openCompletedModal()">View Completed Goals 🏆</button> 
+        </div>
+    
+    <div id="control-buttons">
+        <button id="open-history-modal" onclick="openHistoryModal()">View All Tasks & History</button> 
+        <button id="open-completed-modal" onclick="openCompletedModal()">View Completed Goals 🏆</button> 
+    </div>
+
+    <h2>🎯 Quick Focus Dashboard</h2>
+    <section id="focus-notepads">
+        <div class="notepad daily-focus">
+            <h3>Today's Tasks</h3> 
+            <ul id="daily-tasks-list">
+                </ul>
+        </div>
+        <div class="notepad weekly-focus">
+            <h3>This Week's Tasks</h3>
+            <ul id="weekly-tasks-list">
+                </ul>
+        </div>
+    </section>
+
+    ---
+
+    <h2>🗓️ Maintenance Schedule Calendar</h2>
+    <div id="calendar-controls">
+        <label for="month-select">Month:</label>
+        <select id="month-select" onchange="renderCalendar()"></select>
+        
+        <label for="year-select">Year:</label>
+        <select id="year-select" onchange="renderCalendar()"></select>
+    </div>
+    
+    <div id="calendar-view">
         </div>
 
-        ---
-        
-        <h2>🎯 Quick Focus Dashboard</h2>
-        <section id="focus-notepads">
-            <div class="notepad daily-focus">
-                <h3>Today's Tasks</h3> 
-                <ul id="daily-tasks-list">
-                    </ul>
-            </div>
-            <div class="notepad weekly-focus">
-                <h3>This Week's Tasks</h3>
-                <ul id="weekly-tasks-list">
-                    </ul>
-            </div>
-        </section>
+    ---
 
-        ---
-
-        <h2>🗓️ Maintenance Schedule Calendar</h2>
-        <div id="calendar-controls">
-            <label for="month-select">Month:</label>
-            <select id="month-select" onchange="renderCalendar()"></select>
-            
-            <label for="year-select">Year:</label>
-            <select id="year-select" onchange="renderCalendar()"></select>
-        </div>
-        
-        <div id="calendar-view">
-            </div>
-
-        ---
-
-        <h2>⚠️ Tasks Coming Up (Due/Overdue within 30 days)</h2>
-        <p>Use the buttons to <strong>Complete</strong>, <strong>Skip</strong>, or <strong>Delete</strong>.</p>
-        <table>
-            <thead>
-                <tr>
-                    <th onclick="sortTable('dueDate')">Due Date ⬇️</th>
-                    <th onclick="sortTable('taskName')">Task</th>
-                    <th onclick="sortTable('category')">Category</th>
-                    <th>Status</th>
-                    <th>Actions</th>
-                </tr>
-            </thead>
-            <tbody id="coming-up-list">
-                </tbody>
-        </table>
+    <h2>⚠️ Tasks Coming Up (Due/Overdue within 30 days)</h2>
+    <p>Use the buttons to <strong>Complete</strong>, <strong>Skip</strong>, or <strong>Delete</strong>.</p>
+    <table>
+        <thead>
+            <tr>
+                <th onclick="sortTable('dueDate')">Due Date ⬇️</th>
+                <th onclick="sortTable('taskName')">Task</th>
+                <th onclick="sortTable('category')">Category</th>
+                <th>Status</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody id="coming-up-list">
+            </tbody>
+    </table>
 
     </div>
 
