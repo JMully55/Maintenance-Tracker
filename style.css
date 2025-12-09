@@ -1,22 +1,22 @@
 /* General Layout */
 body {
-    /* Set body background to a neutral color */
-    background-color: #f0f0e0; /* Light beige background behind the paper */
-    margin: 0; /* Remove default body margin */
+    /* Light beige background behind the paper */
+    background-color: #f0f0e0; 
+    margin: 0;
     font-family: 'Arial', sans-serif;
-    padding-bottom: 50px; /* Space at the bottom */
+    padding-bottom: 50px;
 }
 
 .container {
-    max-width: 900px; /* Standard A4 size feel */
-    margin: 50px auto; /* Margin top/bottom, auto center */
+    max-width: 900px; 
+    margin: 50px auto; 
     padding: 40px; 
     
-    /* Simulate Lined Paper Background */
+    /* Simulate Lined Paper Background: White paper, Blue lines, Blue margin */
     background: 
-        /* Horizontal blue lines (simulated) */
+        /* Horizontal blue lines */
         linear-gradient(to bottom, transparent 39px, #75aadb 40px) 0 0 / 100% 40px,
-        /* Vertical pink margin line (now blue) */
+        /* Vertical blue margin line */
         linear-gradient(to right, #a0d0ff 1px, transparent 1px) 80px 0 / 1px 100%,
         /* Base paper color */
         #ffffff;
@@ -25,9 +25,9 @@ body {
     
     border: 1px solid #c0c0c0; 
     border-radius: 4px;
-    box-shadow: 5px 5px 15px rgba(0,0,0,0.3); /* Strong shadow for depth */
+    box-shadow: 5px 5px 15px rgba(0,0,0,0.3);
     
-    /* Add padding to account for the left margin line */
+    /* Padding adjustments for the margin line and flow */
     padding-left: 95px; 
     padding-top: 50px;
     padding-right: 40px;
@@ -65,13 +65,13 @@ h2 {
     background: radial-gradient(circle at 35% 35%, #ff8a8a, #d9534f);
     border: 1px solid rgba(0,0,0,0.2);
     box-shadow: 
-        0 1px 2px rgba(0,0,0,0.5), /* Outer shadow for tack depth */
-        inset 0 1px 1px rgba(255,255,255,0.7); /* Inner highlight */
+        0 1px 2px rgba(0,0,0,0.5), 
+        inset 0 1px 1px rgba(255,255,255,0.7); 
 }
 
 /* Top Left Tack */
 .container:before {
-    top: -9px; /* Half the size of the tack */
+    top: -9px; 
     left: -9px;
 }
 /* Top Right Tack */
@@ -173,13 +173,14 @@ th {
 }
 tr:nth-child(even) { background-color: #fcfcfc; }
 
-/* Calendar Grid */
+/* 📅 Calendar Grid (Ensured minimum height and structure) 📅 */
 #calendar-view {
     display: grid;
     grid-template-columns: repeat(7, 1fr);
     gap: 1px;
     background-color: #ddd;
     border: 1px solid #ccc;
+    min-height: 300px; /* Crucial for initial rendering */
 }
 .calendar-day { background-color: #fff; padding: 8px; min-height: 90px; }
 .calendar-header { background-color: #ffb84d; color: #4a4a4a; text-align: center; padding: 5px; font-weight: bold; }
@@ -187,7 +188,7 @@ tr:nth-child(even) { background-color: #fcfcfc; }
 .task-event.overdue { background-color: #a94442; }
 .empty-day { background-color: #f9f9f9; color: #ccc; }
 
-/* Modal Styles (no change) */
+/* Modal Styles */
 .modal {
     display: none; position: fixed; z-index: 1001; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.4); 
 }
