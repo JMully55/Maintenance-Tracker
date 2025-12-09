@@ -167,7 +167,7 @@ window.renderCalendar = function() {
     }
 };
 
-// --- Modal Functions (FIXED) ---
+// --- Modal Functions (Guard Clause Fixed) ---
 window.openHistoryModal = () => { 
     const modal = document.getElementById('history-modal');
     if (modal) {
@@ -249,7 +249,6 @@ function renderNotepads() {
         
         const isCompletedToday = t.lastCompleted === todayS;
         
-        // Use task index (i) for action buttons directly related to the taskData array index
         const itemTemplate = (action, symbol) => `<li><span class="notepad-checkbox" onclick="${action}(${i})">${symbol}</span>${t.taskName}</li>`;
 
         // 1. Check if due TODAY
