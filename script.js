@@ -65,8 +65,7 @@ function loadTasks() {
 }
 function saveTasks() { localStorage.setItem(STORAGE_KEY, JSON.stringify(taskData)); }
 
-// --- Calendar Logic (Omitted for brevity, assumed correct) ---
-
+// --- Calendar Logic ---
 function setupCalendarControls() {
     const ms = document.getElementById('month-select'), ys = document.getElementById('year-select');
     const now = new Date();
@@ -166,7 +165,6 @@ window.renderCalendar = function() {
     }
 };
 
-
 // --- Modal Functions (omitted for brevity) ---
 window.openHistoryModal = () => { document.getElementById('history-modal').style.display='block'; renderHistoryModal(); };
 window.closeHistoryModal = () => { document.getElementById('history-modal').style.display='none'; };
@@ -208,7 +206,10 @@ function renderNotepads() {
         const due = calculateDueDate(t.lastCompleted, t.frequencyDays, t.isOneTime);
         if (!due || (t.isOneTime && t.frequencyDays === 0)) return;
         const ds = formatDate(due);
+        
+        // 🏆 CHECKMARK TOGGLE FIX: Use markUndone if already done today
         const item = `<li><span class="notepad-checkbox" onclick="${t.lastCompleted===todayS ? `markUndone(${i})` : `markDone(${i})`}">${t.lastCompleted===todayS?'✔️':'◻️'}</span>${t.taskName}</li>`;
+        
         if (ds === todayS) dl.innerHTML += item;
         if (due >= start && due <= end) wl.innerHTML += item;
     });
@@ -230,7 +231,7 @@ function renderDashboard() {
     renderCalendar(); renderNotepads(); saveTasks();
 }
 
-// --- Actions ---
+// --- Actions (MODIFIED) ---
 window.markDone = (idx) => {
     const t = taskData[idx];
     const now = new Date();
@@ -250,7 +251,7 @@ window.markUndone = (idx) => {
     const t = taskData[idx];
     const todayFormatted = formatDate(new Date());
 
-    // 1. Find and remove today's completion entry
+    // 1. Remove today's completion entry
     const historyIndex = t.completionHistory.findIndex(h => h.dateOnly === todayFormatted);
     if (historyIndex > -1) {
         t.completionHistory.splice(historyIndex, 1);
@@ -261,6 +262,7 @@ window.markUndone = (idx) => {
         const previousCompletion = t.completionHistory[t.completionHistory.length - 1];
         t.lastCompleted = previousCompletion.dateOnly;
     } else {
+        // If history is empty after rollback, set lastCompleted to empty string
         t.lastCompleted = '';
     }
 
