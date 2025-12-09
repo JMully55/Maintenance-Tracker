@@ -6,9 +6,7 @@
     <title>Task Simple</title>
     <link rel="stylesheet" href="style.css">
 </head>
-<body onload="initTracker()">
-
-    <div class="container">
+<body> <div class="container">
         <h1>Task Simple 🗓️</h1>
 
         <h2>🎯 Quick Focus Dashboard</h2>
@@ -173,5 +171,9 @@
     </div>
 
     <script src="app.js"></script>
+    <script>
+        // CRITICAL FIX: Initialize the app ONLY after the script file is guaranteed to be loaded
+        document.addEventListener('DOMContentLoaded', initTracker);
+    </script>
 </body>
 </html>
