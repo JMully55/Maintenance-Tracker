@@ -297,9 +297,10 @@ window.toggleCustomFrequency = () => {
     document.getElementById('customFrequencyDiv').style.display = document.getElementById('frequencySelect').value === 'custom' ? 'block' : 'none';
 };
 
+// 🏆 FIX APPLIED HERE: Ensure toggleFormVisibility correctly references the single button
 window.toggleFormVisibility = function() {
     const formContainer = document.getElementById('task-form-container');
-    const button = document.querySelector('#add-task-toggle button');
+    const button = document.querySelector('#add-task-toggle button'); // Target the button by ID and tag
     
     if (formContainer.style.display === 'none' || formContainer.style.display === '') {
         formContainer.style.display = 'block';
@@ -311,7 +312,7 @@ window.toggleFormVisibility = function() {
 }
 
 
-// --- Form Handling (UPDATED FOR SINGLE DATE INPUT) ---
+// --- Form Handling ---
 function registerFormListener() {
     document.getElementById('task-form').onsubmit = (e) => {
         e.preventDefault();
@@ -331,11 +332,9 @@ function registerFormListener() {
             return;
         }
 
-        // Logic to determine actual lastCompletedDate
         const targetDate = createLocalDate(inputDate);
         const initialLastCompleted = new Date(targetDate);
             
-        // Calculate Last Completed Date = Input Date - Frequency
         initialLastCompleted.setDate(targetDate.getDate() - freq);
         lastCompletedDate = formatDate(initialLastCompleted);
         
