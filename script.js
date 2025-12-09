@@ -4,8 +4,7 @@ const STORAGE_KEY = 'maintenanceTrackerTasks';
 // --- Initialization ---
 function initTracker() {
     loadTasks();
-    // CRITICAL: Ensure every task has a static ID based on its index
-    taskData.forEach((t, i) => t.id = i); 
+    taskData.forEach((t, i) => t.id = i);
     setupCalendarControls();
     registerFormListener();
     toggleCustomFrequency(); 
@@ -168,7 +167,7 @@ window.renderCalendar = function() {
     }
 };
 
-// --- Modal Functions (Working) ---
+// --- Modal Functions ---
 window.openHistoryModal = () => { 
     const modal = document.getElementById('history-modal');
     if (modal) {
@@ -208,7 +207,6 @@ function renderHistoryModal() {
     taskData.forEach((t, i) => {
         if (t.isOneTime && t.frequencyDays === 0) return;
         const row = document.createElement('tr');
-        // CRITICAL FIX: Use t.id for actions instead of i (array index)
         row.innerHTML = `<td>${t.lastCompleted}</td><td>${t.taskName}</td><td>${t.category}</td><td>${t.frequencyDays}d</td><td>${t.description}</td><td><button class="delete-button-history" onclick="deleteTask(${t.id})">Delete</button></td>`;
         list.appendChild(row);
     });
@@ -229,7 +227,7 @@ function renderCompletedModal() {
 // --- Dashboard ---
 function renderNotepads() {
     const dl = document.getElementById('daily-tasks-list'), wl = document.getElementById('weekly-tasks-list'), cl = document.getElementById('completed-tasks-list');
-    if (!dl || !wl || !cl) return; // Guard against missing notepad elements
+    if (!dl || !wl || !cl) return; 
     
     dl.innerHTML = ''; wl.innerHTML = ''; cl.innerHTML = '';
     const now = new Date(); 
@@ -251,7 +249,7 @@ function renderNotepads() {
         
         const isCompletedToday = t.lastCompleted === todayS;
         
-        // CRITICAL FIX: Use t.id for actions instead of array index i
+        // Use t.id for actions instead of array index i
         const itemTemplate = (action, symbol) => `<li><span class="notepad-checkbox" onclick="${action}(${t.id})">${symbol}</span>${t.taskName}</li>`;
 
         // 1. Check if due TODAY
@@ -302,7 +300,7 @@ function renderDashboard() {
         const status = getStatus(due);
         if (status.sortValue <= 30) {
             const row = document.createElement('tr'); row.className = status.class;
-            // CRITICAL FIX: Use t.id for actions instead of i (array index)
+            // Use t.id for actions instead of array index i
             row.innerHTML = `<td>${formatDate(due)}</td><td>${t.taskName}</td><td>${t.category}</td><td>${status.text}</td>
             <td><button onclick="markDone(${t.id})">Done</button> ${t.isOneTime?'':`<button class="skip-button" onclick="skipTask(${t.id})">Skip</button>`} <button class="delete-button" onclick="deleteTask(${t.id})">Delete</button></td>`;
             list.appendChild(row);
@@ -311,7 +309,7 @@ function renderDashboard() {
     renderCalendar(); renderNotepads(); saveTasks();
 }
 
-// --- Actions (Updated to find task by ID) ---
+// --- Actions ---
 window.markDone = (taskId) => {
     // Find task by static ID
     const t = taskData.find(task => task.id === taskId);
