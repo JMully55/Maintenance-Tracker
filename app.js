@@ -272,15 +272,15 @@ function renderNotepads() {
         // CRITICAL: The action now calls markDone if incomplete, markUndone if complete
         const action = isCompletedToday ? `markUndone` : `markDone`;
 
-        // 1. Check if due TODAY
-        if (ds === todayS) {
+        // 1. Check if due TODAY OR if completed TODAY (to keep it visible with strike-through)
+        if (ds === todayS || isCompletedToday) { 
             dailyTasksCount++;
             const item = `<li class="${itemClass}"><span class="notepad-checkbox" onclick="${action}(${t.id})">${itemSymbol}</span>${t.taskName}</li>`;
             dl.innerHTML += item;
         }
         
-        // 2. Items for Weekly List
-        if (due >= start && due <= end) {
+        // 2. Items for Weekly List: Check if due this week OR if completed today 
+        if ((due >= start && due <= end) || isCompletedToday) {
              weeklyTasksCount++;
              const item = `<li class="${itemClass}"><span class="notepad-checkbox" onclick="${action}(${t.id})">${itemSymbol}</span>${t.taskName} (${ds})</li>`;
              wl.innerHTML += item;
@@ -380,7 +380,6 @@ window.deleteTask = (taskId) => {
         const indexToDelete = taskData.findIndex(t => t.id === taskId);
         if (indexToDelete > -1) {
             taskData.splice(indexToDelete, 1);
-            // *** REMOVED UNNECESSARY RE-INDEXING LOOP HERE ***
         }
         renderDashboard(); 
     }
