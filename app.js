@@ -9,12 +9,14 @@ function loadTasks() {
         taskData.forEach(t => {
             if (!t.completionHistory) t.completionHistory = [];
             if (typeof t.isOneTime === 'undefined') t.isOneTime = false;
+            // CRITICAL: Initialize volatile status flag (will not be saved)
+            if (typeof t.completedToday === 'undefined') t.completedToday = false; 
         });
     }
 }
 
 function saveTasks() { 
-    // When saving, remove the temporary status flag to prevent persistence errors.
+    // CRITICAL: When saving, remove the temporary status flag to prevent persistence errors.
     const tasksToSave = taskData.map(t => {
         const { completedToday, ...rest } = t;
         return rest;
@@ -186,7 +188,7 @@ window.renderCalendar = function() {
     }
 };
 
-// --- Modal Functions (omitted for brevity) ---
+// --- Modal Functions ---
 window.openHistoryModal = () => { 
     const modal = document.getElementById('history-modal');
     if (modal) { modal.style.display = 'block'; renderHistoryModal(); }
@@ -262,15 +264,16 @@ function renderNotepads() {
         if (!due || (t.isOneTime && t.frequencyDays === 0)) return;
         const ds = formatDate(due);
         
-        // CHECK VISUAL STATUS IS BASED PURELY ON DB
-        const isCompletedToday = t.lastCompleted === todayS;
-        const itemClass = isCompletedToday ? 'visually-complete' : '';
-        const itemSymbol = isCompletedToday ? '✔️' : '◻️';
+        // CRITICAL FIX: Check visual status using the volatile flag OR the DB completion status
+        const isVisuallyComplete = t.completedToday || (t.lastCompleted === todayS);
+        const itemClass = isVisuallyComplete ? 'visually-complete' : '';
+        const itemSymbol = isVisuallyComplete ? '✔️' : '◻️';
         
-        // CRITICAL: The action now calls markDone if incomplete, markUndone if complete
-        const action = isCompletedToday ? `markUndone` : `markDone`;
+        // CRITICAL FIX: The action now calls the dedicated volatile functions
+        const action = isVisuallyComplete ? `markVisuallyUndone` : `markVisuallyDone`;
 
         // 1. Check if due TODAY
+        // IMPORTANT: The task stays in this list as long as the DUE date is today, regardless of its 'completedToday' status
         if (ds === todayS) {
             dailyTasksCount++;
             const item = `<li class="${itemClass}"><span class="notepad-checkbox" onclick="${action}(${t.id})">${itemSymbol}</span>${t.taskName}</li>`;
@@ -303,17 +306,55 @@ function renderDashboard() {
         const status = getStatus(due);
         if (status.sortValue <= 30) {
             const row = document.createElement('tr'); row.className = status.class;
-            // Use t.id for actions instead of array index i
+            // Formal 'Done' button in the table uses the formal recurrence update
             row.innerHTML = `<td>${formatDate(due)}</td><td>${t.taskName}</td><td>${t.category}</td><td>${status.text}</td>
-            <td><button onclick="markDone(${t.id})">Done</button> ${t.isOneTime?'':`<button class="skip-button" onclick="skipTask(${t.id})">Skip</button>`} <button class="delete-button" onclick="deleteTask(${t.id})">Delete</button></td>`;
+            <td><button onclick="markDoneFormal(${t.id})">Done</button> ${t.isOneTime?'':`<button class="skip-button" onclick="skipTask(${t.id})">Skip</button>`} <button class="delete-button" onclick="deleteTask(${t.id})">Delete</button></td>`;
             list.appendChild(row);
         }
     });
     renderCalendar(); renderNotepads(); saveTasks();
 }
 
-// --- Actions (Formal Completion/Uncompletion - FIXES OVERDUE ISSUE) ---
-window.markDone = (taskId) => {
+// --- NEW VOLATILE ACTIONS (Post-it Checkmark) ---
+
+// Mark Done (Visual only for post-it check)
+window.markVisuallyDone = (taskId) => {
+    const t = taskData.find(task => task.id === taskId);
+    if (!t) return;
+    
+    // Set volatile status flag and ensure task is completed today if clicked
+    t.completedToday = true; 
+    
+    // Check if task was formally completed today
+    if (t.lastCompleted !== formatDate(new Date())) {
+        // If not formally completed, we MUST call formal completion here if we want the checkmark to trigger recurrence *at midnight*.
+        // However, based on the request ("don't update the recurrence engine"), we only update the VISUAL flag.
+        // We will stick to the visual-only update.
+    }
+    
+    renderDashboard();
+};
+
+// Mark Undone (Visual only for post-it uncheck)
+window.markVisuallyUndone = (taskId) => {
+    const t = taskData.find(task => task.id === taskId);
+    if (!t) return;
+    
+    // Clear volatile status flag
+    t.completedToday = false; 
+    
+    // If the task was also formally completed today (which shouldn't happen via the checkmark in this new logic, but protects against table click issues), undo it.
+    if (t.lastCompleted === formatDate(new Date())) {
+        markUndoneFormal(taskId); 
+    } else {
+        renderDashboard(); 
+    }
+};
+
+// --- FORMAL ACTIONS (Table Buttons - DB Update) ---
+
+// Formal Mark Done (Updates recurrence date, used by the main Done button)
+window.markDoneFormal = (taskId) => {
     const t = taskData.find(task => task.id === taskId);
     if (!t) return;
     
@@ -328,10 +369,14 @@ window.markDone = (taskId) => {
 
     if (t.isOneTime) t.frequencyDays = 0;
     
+    // Ensure visual state is also set
+    t.completedToday = true;
+
     renderDashboard();
 };
 
-window.markUndone = (taskId) => {
+// Formal Mark Undone (Reverses DB update, used internally if needed)
+function markUndoneFormal(taskId) {
     const t = taskData.find(task => task.id === taskId);
     if (!t) return;
     
@@ -355,11 +400,14 @@ window.markUndone = (taskId) => {
     if (t.isOneTime && t.frequencyDays === 0) {
         t.frequencyDays = 1; 
     }
+}
 
-    renderDashboard();
-};
+// Overwrite previous global wrappers to use the visual ones
+window.markDone = window.markVisuallyDone;
+window.markUndone = window.markVisuallyUndone;
 
 
+// The following remain the same
 window.skipTask = (taskId) => {
     const t = taskData.find(task => task.id === taskId);
     if (!t) return;
