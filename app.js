@@ -77,7 +77,7 @@ function getStatus(dueDate) {
     return { text: 'Upcoming', class: '', sortValue: diff };
 }
 
-// --- Calendar Logic (EXTRA GUARDING) ---
+// --- Calendar Logic ---
 function setupCalendarControls() {
     const ms = document.getElementById('month-select'), ys = document.getElementById('year-select');
     if (!ms || !ys) return; 
@@ -142,15 +142,12 @@ window.renderCalendar = function() {
     const monthSelect = document.getElementById('month-select');
     const yearSelect = document.getElementById('year-select');
 
-    // CRITICAL GUARD: Ensure all elements are found AND have valid values
     if (!view || !monthSelect || !yearSelect) return; 
     
     view.innerHTML = '';
-    // Ensure values are numbers before proceeding
     const m = parseInt(monthSelect.value);
     const y = parseInt(yearSelect.value);
 
-    // Stop if parsing fails (e.g., dropdown is initially empty)
     if (isNaN(m) || isNaN(y)) return;
 
     const start = new Date(y, m, 1);
@@ -189,7 +186,7 @@ window.renderCalendar = function() {
     }
 };
 
-// --- Modal Functions (Working) ---
+// --- Modal Functions (omitted for brevity) ---
 window.openHistoryModal = () => { 
     const modal = document.getElementById('history-modal');
     if (modal) { modal.style.display = 'block'; renderHistoryModal(); }
@@ -306,7 +303,7 @@ function renderDashboard() {
         const status = getStatus(due);
         if (status.sortValue <= 30) {
             const row = document.createElement('tr'); row.className = status.class;
-            // The table buttons remain the formal completion/recurrence trigger
+            // Use t.id for actions instead of array index i
             row.innerHTML = `<td>${formatDate(due)}</td><td>${t.taskName}</td><td>${t.category}</td><td>${status.text}</td>
             <td><button onclick="markDone(${t.id})">Done</button> ${t.isOneTime?'':`<button class="skip-button" onclick="skipTask(${t.id})">Skip</button>`} <button class="delete-button" onclick="deleteTask(${t.id})">Delete</button></td>`;
             list.appendChild(row);
