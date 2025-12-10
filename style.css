@@ -111,27 +111,23 @@ form button[type="submit"] {
     box-shadow: 0 2px 5px rgba(0,0,0,0.2);
 }
 
-/* Focus Notepads Layout Adjustments */
+/* Focus Notepads Layout Adjustments (Reverted to two notes) */
 #focus-notepads-row1 {
     display: flex;
     justify-content: space-around;
     gap: 20px;
-    margin-bottom: 20px;
+    margin-bottom: 30px; /* Increased margin since row 2 is gone */
 }
-#focus-notepads-row2 {
-    display: flex;
-    justify-content: center; /* Center the single note in the second row */
-    margin-bottom: 30px;
-}
+
+/* Removed: #focus-notepads-row2 */
+
 .notepad {
+    flex: 1; /* Restore flex: 1 for two notes */
     min-height: 180px;
     padding: 15px;
     border-radius: 5px;
     box-shadow: 2px 2px 8px rgba(0, 0, 0, 0.15);
     font-family: 'Georgia', serif;
-}
-#focus-notepads-row2 .notepad {
-    flex: 0 1 50%; /* Make the completed note span half the width and center it */
 }
 
 
@@ -139,18 +135,18 @@ form button[type="submit"] {
 .daily-focus { background-color: #fffd8b; transform: rotate(-1deg); }
 .weekly-focus { background-color: #b3e5fc; transform: rotate(1deg); }
 
-/* Completed Note Style (Green) */
-.completed-daily-focus {
-    background-color: #d6f2c2; /* Very Light Green */
-    transform: none; /* No rotation */
-    border: 1px solid #5cb85c;
-}
+/* Removed: .completed-daily-focus */
+
 .notepad h3 { margin-top: 0; border-bottom: 1px solid rgba(0,0,0,0.1); }
 .notepad ul { list-style: none; padding: 0; }
 .notepad li { padding: 5px 0; display: flex; align-items: center; border-bottom: 1px dotted rgba(0,0,0,0.05); }
 .notepad-checkbox { cursor: pointer; margin-right: 10px; font-size: 1.2em; }
-.completed-task-note { text-decoration: line-through; color: #777; }
 
+/* NEW STRIKE-THROUGH CLASS */
+.visually-complete { 
+    text-decoration: line-through 3px #a94442; /* Reddish strike-through */
+    color: #777; 
+}
 
 /* Control Button Positioning (Side-by-side) */
 #control-buttons {
@@ -241,7 +237,7 @@ tr:nth-child(even) { background-color: #fcfcfc; }
 .modal {
     display: none; 
     position: fixed; 
-    z-index: 2000; /* CRITICAL: Ensures modal is on top */
+    z-index: 2000; 
     left: 0; top: 0; width: 100%; height: 100%; 
     background-color: rgba(0,0,0,0.7); 
 }
