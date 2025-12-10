@@ -9,16 +9,14 @@ function loadTasks() {
         taskData.forEach(t => {
             if (!t.completionHistory) t.completionHistory = [];
             if (typeof t.isOneTime === 'undefined') t.isOneTime = false;
-            // CRITICAL: Initialize volatile status flag (non-persistent)
-            if (typeof t.isStruckThrough === 'undefined') t.isStruckThrough = false;
         });
     }
 }
 
 function saveTasks() { 
-    // CRITICAL: When saving, remove the temporary status flag to prevent persistence errors.
+    // When saving, remove the temporary status flag to prevent persistence errors.
     const tasksToSave = taskData.map(t => {
-        const { isStruckThrough, ...rest } = t;
+        const { completedToday, ...rest } = t;
         return rest;
     });
     localStorage.setItem(STORAGE_KEY, JSON.stringify(tasksToSave));
@@ -32,10 +30,12 @@ function initTracker() {
             t.id = Date.now() + i + Math.floor(Math.random() * 1000); 
         }
     });
+    // CRITICAL: Ensure setup runs before renderDashboard
     setupCalendarControls();
     registerFormListener();
     toggleCustomFrequency(); 
     sortTable('dueDate');
+    
     renderDashboard(); 
 }
 
@@ -79,20 +79,170 @@ function getStatus(dueDate) {
     return { text: 'Upcoming', class: '', sortValue: diff };
 }
 
-// --- Calendar Logic (omitted for brevity) ---
-function setupCalendarControls() { /* ... */ }
-function getRecurringDueDates(task, mStart, mEnd) { /* ... */ }
-window.renderCalendar = function() { /* ... */ };
-window.openHistoryModal = () => { /* ... */ };
-window.closeHistoryModal = () => { /* ... */ };
-window.openCompletedModal = () => { /* ... */ };
-window.closeCompletedModal = () => { /* ... */ };
-window.onclick = (event) => { /* ... */ };
-function renderHistoryModal() { /* ... */ }
-function renderCompletedModal() { /* ... */ }
+// --- Calendar Logic (MAXIMUM GUARDING) ---
+function setupCalendarControls() {
+    const ms = document.getElementById('month-select'), ys = document.getElementById('year-select');
+    if (!ms || !ys) return; 
+    const now = new Date();
+    const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+    ms.innerHTML = months.map((m, i) => `<option value="${i}" ${i===now.getMonth()?'selected':''}>${m}</option>`).join('');
+    for (let y = now.getFullYear() - 2; y <= now.getFullYear() + 5; y++) {
+        const op = document.createElement('option'); op.value = y; op.text = y;
+        if (y === now.getFullYear()) op.selected = true;
+        ys.appendChild(op);
+    }
+}
+
+function getRecurringDueDates(task, mStart, mEnd) {
+    const events = {};
+    if (task.isOneTime && task.frequencyDays === 0) return events;
+    if (!task.lastCompleted) return events;
+    
+    const frequency = parseInt(task.frequencyDays);
+    if (isNaN(frequency) || frequency <= 0) {
+        if(task.isOneTime && frequency === 1) {
+            const nextDueDate = calculateDueDate(task.lastCompleted, 1, true);
+            if (nextDueDate >= mStart && nextDueDate <= mEnd) {
+                 events[formatDate(nextDueDate)] = { name: `${task.taskName} (1-Time)`, overdue: nextDueDate.getTime() < getToday() };
+            }
+            return events;
+        }
+        return events;
+    }
+
+    let currentDate = calculateDueDate(task.lastCompleted, frequency, task.isOneTime);
+    
+    if (!currentDate) return events;
+    currentDate.setHours(0, 0, 0, 0); 
+    
+    if (currentDate.getTime() < mStart.getTime() && !task.isOneTime) {
+        const daysDiff = Math.ceil((mStart.getTime() - currentDate.getTime()) / 86400000);
+        const cyclesToSkip = Math.ceil(daysDiff / frequency);
+        currentDate.setDate(currentDate.getDate() + cyclesToSkip * frequency);
+    }
+    
+    while (currentDate.getTime() <= mEnd.getTime()) {
+        
+        if (currentDate.getTime() >= mStart.getTime()) {
+            const dateString = formatDate(currentDate);
+            events[dateString] = { 
+                name: task.taskName + (task.isOneTime ? ' (1-Time)':''), 
+                overdue: currentDate.getTime() < getToday() 
+            };
+        }
+
+        if (task.isOneTime) break;
+        
+        currentDate.setDate(currentDate.getDate() + frequency);
+    }
+    return events;
+}
 
 
-// --- Dashboard (Pure Visual Toggle Logic) ---
+window.renderCalendar = function() {
+    const view = document.getElementById('calendar-view');
+    const monthSelect = document.getElementById('month-select');
+    const yearSelect = document.getElementById('year-select');
+
+    if (!view || !monthSelect || !yearSelect) return; 
+    
+    view.innerHTML = '';
+    const m = parseInt(monthSelect.value);
+    const y = parseInt(yearSelect.value);
+
+    if (isNaN(m) || isNaN(y)) return;
+
+    const start = new Date(y, m, 1);
+    
+    start.setDate(start.getDate() - start.getDay());
+    start.setHours(0, 0, 0, 0); 
+
+    const end = new Date(start); end.setDate(end.getDate() + 42);
+    end.setHours(0, 0, 0, 0); 
+
+    const allEvents = {};
+    taskData.forEach(t => {
+        const evs = getRecurringDueDates(t, start, end);
+        for (let d in evs) { if (!allEvents[d]) allEvents[d] = []; allEvents[d].push(evs[d]); }
+    });
+
+    ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].forEach(d => {
+        const h = document.createElement('div'); h.className='calendar-header'; h.innerText=d; view.appendChild(h);
+    });
+
+    let curr = new Date(start);
+    for (let i=0; i<42; i++) {
+        const ds = formatDate(curr);
+        const dDiv = document.createElement('div'); 
+        dDiv.className='calendar-day' + (curr.getMonth()!==m?' empty-day':'');
+        dDiv.innerHTML = `<strong>${curr.getDate()}</strong>`;
+        
+        if (allEvents[ds]) {
+            allEvents[ds].forEach(e => {
+                const eDiv = document.createElement('div'); eDiv.className='task-event' + (e.overdue?' overdue':'');
+                eDiv.innerText = e.name; dDiv.appendChild(eDiv);
+            });
+        }
+        view.appendChild(dDiv);
+        curr.setDate(curr.getDate()+1);
+    }
+};
+
+// --- Modal Functions ---
+window.openHistoryModal = () => { 
+    const modal = document.getElementById('history-modal');
+    if (modal) { modal.style.display = 'block'; renderHistoryModal(); }
+};
+window.closeHistoryModal = () => { 
+    const modal = document.getElementById('history-modal');
+    if (modal) modal.style.display = 'none'; 
+};
+
+window.openCompletedModal = () => { 
+    const modal = document.getElementById('completed-modal');
+    if (modal) {
+        modal.style.display = 'block'; 
+        const searchInput = document.getElementById('completed-search');
+        if (searchInput) searchInput.value = ''; 
+        renderCompletedModal();
+    }
+};
+window.closeCompletedModal = () => { 
+    const modal = document.getElementById('completed-modal');
+    if (modal) modal.style.display = 'none'; 
+};
+
+window.onclick = (event) => { 
+    const modalH = document.getElementById('history-modal');
+    const modalC = document.getElementById('completed-modal');
+    if (event.target === modalH) closeHistoryModal(); 
+    if (event.target === modalC) closeCompletedModal(); 
+};
+
+function renderHistoryModal() {
+    const list = document.getElementById('history-list'); if (!list) return;
+    list.innerHTML = '';
+    taskData.forEach((t, i) => {
+        if (t.isOneTime && t.frequencyDays === 0) return;
+        const row = document.createElement('tr');
+        row.innerHTML = `<td>${t.lastCompleted}</td><td>${t.taskName}</td><td>${t.category}</td><td>${t.frequencyDays}d</td><td>${t.description}</td><td><button class="delete-button-history" onclick="deleteTask(${t.id})">Delete</button></td>`;
+        list.appendChild(row);
+    });
+}
+function renderCompletedModal() {
+    const list = document.getElementById('completed-list'); if (!list) return;
+    list.innerHTML = '';
+    const q = document.getElementById('completed-search')?.value.toLowerCase() || '';
+    let history = [];
+    taskData.forEach(t => t.completionHistory.forEach(h => {
+        if (t.taskName.toLowerCase().includes(q) || t.category.toLowerCase().includes(q)) history.push({ name: t.taskName, cat: t.category, time: h.timestamp });
+    }));
+    history.sort((a,b) => new Date(b.time) - new Date(a.time)).forEach(h => {
+        list.innerHTML += `<tr><td>${formatTimestamp(h.time)}</td><td>${h.name}</td><td>${h.cat}</td></tr>`;
+    });
+}
+
+// --- Dashboard (Strike-Through Rendering) ---
 function renderNotepads() {
     const dl = document.getElementById('daily-tasks-list'), wl = document.getElementById('weekly-tasks-list');
     if (!dl || !wl) return; 
@@ -114,13 +264,13 @@ function renderNotepads() {
         if (!due || (t.isOneTime && t.frequencyDays === 0)) return;
         const ds = formatDate(due);
         
-        // CRITICAL: Check visual status using the volatile flag OR the DB completion status
-        const isVisuallyComplete = t.isStruckThrough || (t.lastCompleted === todayS);
-        const itemClass = isVisuallyComplete ? 'visually-complete' : '';
-        const itemSymbol = isVisuallyComplete ? '✔️' : '◻️';
+        // CHECK VISUAL STATUS IS BASED PURELY ON DB
+        const isCompletedToday = t.lastCompleted === todayS;
+        const itemClass = isCompletedToday ? 'visually-complete' : '';
+        const itemSymbol = isCompletedToday ? '✔️' : '◻️';
         
-        // The post-it action now ONLY toggles the visual flag (toggleStrikeThrough)
-        const action = `toggleStrikeThrough`; 
+        // CRITICAL: The action now calls markDone if incomplete, markUndone if complete
+        const action = isCompletedToday ? `markUndone` : `markDone`;
 
         // 1. Check if due TODAY
         if (ds === todayS) {
@@ -155,49 +305,28 @@ function renderDashboard() {
         const status = getStatus(due);
         if (status.sortValue <= 30) {
             const row = document.createElement('tr'); row.className = status.class;
-            // The table buttons are the formal recurrence trigger
+            // Use t.id for actions instead of array index i
             row.innerHTML = `<td>${formatDate(due)}</td><td>${t.taskName}</td><td>${t.category}</td><td>${status.text}</td>
-            <td><button onclick="markDoneFormal(${t.id})">Done</button> ${t.isOneTime?'':`<button class="skip-button" onclick="skipTask(${t.id})">Skip</button>`} <button class="delete-button" onclick="deleteTask(${t.id})">Delete</button></td>`;
+            <td><button onclick="markDone(${t.id})">Done</button> ${t.isOneTime?'':`<button class="skip-button" onclick="skipTask(${t.id})">Skip</button>`} <button class="delete-button" onclick="deleteTask(${t.id})">Delete</button></td>`;
             list.appendChild(row);
         }
     });
     renderCalendar(); renderNotepads(); saveTasks();
 }
 
-// --- NEW ACTION: Pure Visual Toggle for Post-its ---
-window.toggleStrikeThrough = (taskId) => {
-    const t = taskData.find(task => task.id === taskId);
-    if (!t) return;
-    
-    // Toggle the volatile status flag
-    t.isStruckThrough = !t.isStruckThrough; 
-    
-    // CRITICAL: We only formally mark it complete IF the user is checking it OFF
-    if (t.isStruckThrough) {
-        // Option 1: Visually mark done, but DO NOT change recurrence date.
-        // We rely on the formal button to update recurrence.
-    } else {
-        // If the user UNCHECKS it, and it was formally complete today, undo the formal completion
-        if (t.lastCompleted === formatDate(new Date())) {
-            markUndoneFormal(taskId); 
-        }
-    }
-    
-    renderDashboard();
-};
-
-
-// --- FORMAL ACTIONS (Table Buttons - DB Update) ---
-
-// Formal Mark Done (Updates recurrence date, used by the main Done button)
-window.markDoneFormal = (taskId) => {
+// --- Actions (Formal Completion/Uncompletion - FINAL FIXES) ---
+window.markDone = (taskId) => {
     const t = taskData.find(task => task.id === taskId);
     if (!t) return;
     
     const now = new Date();
     const todayFormatted = formatDate(now);
 
-    if (t.lastCompleted === todayFormatted) return; 
+    // CRITICAL FIX 1: Prevent duplicate history entry if already marked done today
+    if (t.lastCompleted === todayFormatted) {
+        renderDashboard();
+        return; 
+    }
     
     // Formal Completion: Updates DB and fixes overdue issue
     t.completionHistory.push({ timestamp: now.toISOString(), dateOnly: todayFormatted });
@@ -205,14 +334,10 @@ window.markDoneFormal = (taskId) => {
 
     if (t.isOneTime) t.frequencyDays = 0;
     
-    // Ensure visual state is also set
-    t.isStruckThrough = true;
-
     renderDashboard();
 };
 
-// Formal Mark Undone (Reverses DB update, used internally or by history)
-function markUndoneFormal(taskId) {
+window.markUndone = (taskId) => {
     const t = taskData.find(task => task.id === taskId);
     if (!t) return;
     
@@ -236,14 +361,9 @@ function markUndoneFormal(taskId) {
     if (t.isOneTime && t.frequencyDays === 0) {
         t.frequencyDays = 1; 
     }
-    
-    // Clear visual state
-    t.isStruckThrough = false; 
-}
 
-// NOTE: We keep the markDone/markUndone wrappers pointing to the volatile versions
-window.markDone = window.toggleStrikeThrough;
-window.markUndone = window.toggleStrikeThrough;
+    renderDashboard();
+};
 
 
 window.skipTask = (taskId) => {
