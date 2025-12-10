@@ -1,7 +1,5 @@
 let taskData = []; 
 const STORAGE_KEY = 'maintenanceTrackerTasks';
-// Array to store the IDs of tasks that are currently visually struck through in this session
-let visuallyCompleted = []; 
 
 // --- Persistence ---
 function loadTasks() {
@@ -77,9 +75,7 @@ function getStatus(dueDate) {
 // --- Calendar Logic ---
 function setupCalendarControls() {
     const ms = document.getElementById('month-select'), ys = document.getElementById('year-select');
-    // Guard against missing selectors
     if (!ms || !ys) return; 
-    
     const now = new Date();
     const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
     ms.innerHTML = months.map((m, i) => `<option value="${i}" ${i===now.getMonth()?'selected':''}>${m}</option>`).join('');
@@ -138,7 +134,6 @@ function getRecurringDueDates(task, mStart, mEnd) {
 
 window.renderCalendar = function() {
     const view = document.getElementById('calendar-view');
-    // CRITICAL: Ensure inputs exist before parsing values
     const monthSelect = document.getElementById('month-select');
     const yearSelect = document.getElementById('year-select');
 
@@ -183,7 +178,7 @@ window.renderCalendar = function() {
     }
 };
 
-// --- Modal Functions (Working) ---
+// --- Modal Functions (omitted for brevity) ---
 window.openHistoryModal = () => { 
     const modal = document.getElementById('history-modal');
     if (modal) { modal.style.display = 'block'; renderHistoryModal(); }
@@ -237,7 +232,7 @@ function renderCompletedModal() {
     });
 }
 
-// --- Dashboard (Strike-Through Rendering) ---
+// --- Dashboard (Final Synchronized Render) ---
 function renderNotepads() {
     const dl = document.getElementById('daily-tasks-list'), wl = document.getElementById('weekly-tasks-list');
     if (!dl || !wl) return; 
@@ -264,7 +259,7 @@ function renderNotepads() {
         const itemClass = isCompletedToday ? 'visually-complete' : '';
         const itemSymbol = isCompletedToday ? '✔️' : '◻️';
         
-        // CRITICAL: The action now calls markDone/markUndone to update the DB
+        // CRITICAL: The action now calls markDone if incomplete, markUndone if complete
         const action = isCompletedToday ? `markUndone` : `markDone`;
 
         // 1. Check if due TODAY
@@ -309,7 +304,7 @@ function renderDashboard() {
     renderCalendar(); renderNotepads(); saveTasks();
 }
 
-// --- Actions (Formal Completion/Uncompletion) ---
+// --- Actions (Formal Completion/Uncompletion - FIXES OVERDUE ISSUE) ---
 window.markDone = (taskId) => {
     const t = taskData.find(task => task.id === taskId);
     if (!t) return;
