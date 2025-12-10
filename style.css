@@ -144,8 +144,8 @@ form button[type="submit"] {
 }
 .notepad-checkbox { cursor: pointer; margin-right: 10px; font-size: 1.2em; }
 
-/* CRITICAL: STRIKE-THROUGH CLASS (Max Precedence) */
-.visually-complete { 
+/* CRITICAL: STRIKE-THROUGH CLASS (Maximum Specificity to override list styles) */
+.notepad li.visually-complete { 
     text-decoration: line-through 3px #a94442 !important; /* Force strike-through */
     color: #777 !important; /* Force grey color */
 }
