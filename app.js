@@ -380,7 +380,7 @@ window.deleteTask = (taskId) => {
         const indexToDelete = taskData.findIndex(t => t.id === taskId);
         if (indexToDelete > -1) {
             taskData.splice(indexToDelete, 1);
-            taskData.forEach((t, i) => t.id = i);
+            // *** REMOVED UNNECESSARY RE-INDEXING LOOP HERE ***
         }
         renderDashboard(); 
     }
