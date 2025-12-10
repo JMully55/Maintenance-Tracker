@@ -140,15 +140,14 @@ form button[type="submit"] {
     display: flex; 
     align-items: center; 
     border-bottom: 1px dotted rgba(0,0,0,0.05); 
-    /* Ensures strike-through applies to the list item text */
     transition: all 0.2s; 
 }
 .notepad-checkbox { cursor: pointer; margin-right: 10px; font-size: 1.2em; }
 
-/* CRITICAL: STRIKE-THROUGH CLASS */
+/* CRITICAL: STRIKE-THROUGH CLASS (Max Precedence) */
 .visually-complete { 
-    text-decoration: line-through 3px #a94442; 
-    color: #777; 
+    text-decoration: line-through 3px #a94442 !important; /* Force strike-through */
+    color: #777 !important; /* Force grey color */
 }
 
 
