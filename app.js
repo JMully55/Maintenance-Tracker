@@ -252,37 +252,65 @@ function renderNotepads() {
     const dailyH3 = document.querySelector('.daily-focus h3');
     if (dailyH3) dailyH3.textContent = `Today's Tasks (${formatDate(now)})`;
     
-    const todayS = formatDate(now), start = new Date(now), end = new Date(start); 
+    const todayS = formatDate(now);
+    const start = new Date(now), end = new Date(start); 
     start.setDate(now.getDate() - now.getDay()); start.setHours(0,0,0,0); 
     end.setDate(start.getDate() + 6); end.setHours(23,59,59,999);
 
     let dailyTasksCount = 0;
     let weeklyTasksCount = 0;
     
-    taskData.forEach((t, i) => {
-        const due = calculateDueDate(t.lastCompleted, t.frequencyDays, t.isOneTime);
-        if (!due || (t.isOneTime && t.frequencyDays === 0)) return;
-        const ds = formatDate(due);
+    taskData.forEach((t) => {
+        if (t.isOneTime && t.frequencyDays === 0) return;
+
+        // 1. Calculate the 'Expected' Due Date based on the LAST recorded completion
+        const lastCompDate = t.lastCompleted;
+        const frequency = t.frequencyDays;
         
-        // CHECK VISUAL STATUS IS BASED PURELY ON DB
-        const isCompletedToday = t.lastCompleted === todayS;
+        let expectedDue = null;
+        if (lastCompDate) {
+            expectedDue = calculateDueDate(lastCompDate, frequency, t.isOneTime);
+        } else {
+            // For tasks with no history, they are immediately 'due'.
+            expectedDue = now; 
+        }
+
+        if (!expectedDue) return;
+
+        const expectedDueS = formatDate(expectedDue);
+        
+        // Check 1: Has this task already been marked complete TODAY?
+        const isCompletedToday = lastCompDate === todayS; 
+
+        // Check 2: Is the task due today or past due?
+        const isCurrentlyDueToday = expectedDueS === todayS || expectedDue.getTime() < getToday();
+
+        // Check 3: Is the task due this week (within the notepad timeframe)?
+        const isDueThisWeek = expectedDue >= start && expectedDue <= end;
+
+
+        // Determine Visual State and Action
         const itemClass = isCompletedToday ? 'visually-complete' : '';
         const itemSymbol = isCompletedToday ? '✔️' : '◻️';
-        
-        // CRITICAL: The action now calls markDone if incomplete, markUndone if complete
         const action = isCompletedToday ? `markUndone` : `markDone`;
 
-        // 1. Check if due TODAY OR if completed TODAY (to keep it visible with strike-through)
-        if (ds === todayS || isCompletedToday) { 
+        // ----------------------------------------------------------------------
+        // DAILY TASK LIST LOGIC
+        // Must appear if (A) it's due today/overdue OR (B) it was marked complete today
+        if (isCurrentlyDueToday || isCompletedToday) { 
             dailyTasksCount++;
             const item = `<li class="${itemClass}"><span class="notepad-checkbox" onclick="${action}(${t.id})">${itemSymbol}</span>${t.taskName}</li>`;
             dl.innerHTML += item;
         }
-        
-        // 2. Items for Weekly List: Check if due this week OR if completed today 
-        if ((due >= start && due <= end) || isCompletedToday) {
+
+        // ----------------------------------------------------------------------
+        // WEEKLY TASK LIST LOGIC
+        // Must appear if (A) it's due this week OR (B) it was marked complete today
+        if (isDueThisWeek || isCompletedToday) {
              weeklyTasksCount++;
-             const item = `<li class="${itemClass}"><span class="notepad-checkbox" onclick="${action}(${t.id})">${itemSymbol}</span>${t.taskName} (${ds})</li>`;
+             // Use expected due date unless it was completed today (then use today's date for display consistency)
+             const dueDisplay = isCompletedToday ? todayS : expectedDueS; 
+             const item = `<li class="${itemClass}"><span class="notepad-checkbox" onclick="${action}(${t.id})">${itemSymbol}</span>${t.taskName} (${dueDisplay})</li>`;
              wl.innerHTML += item;
         }
     });
@@ -314,7 +342,7 @@ function renderDashboard() {
     renderCalendar(); renderNotepads(); saveTasks();
 }
 
-// --- Actions (Formal Completion/Uncompletion - FINAL FIXES) ---
+// --- Actions (Formal Completion/Uncompletion) ---
 window.markDone = (taskId) => {
     const t = taskData.find(task => task.id === taskId);
     if (!t) return;
@@ -322,7 +350,7 @@ window.markDone = (taskId) => {
     const now = new Date();
     const todayFormatted = formatDate(now);
 
-    // CRITICAL FIX 1: Prevent duplicate history entry if already marked done today
+    // Prevent duplicate history entry if already marked done today
     if (t.lastCompleted === todayFormatted) {
         renderDashboard();
         return; 
