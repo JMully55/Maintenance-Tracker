@@ -87,6 +87,10 @@ form {
     border: 1px dashed #c0c0c0; 
     padding: 15px;
     box-shadow: none; 
+    
+    /* *** ADDED THIS LINE FOR RELIABLE GRID LAYOUT *** */
+    display: grid;
+    
     grid-template-columns: repeat(3, 1fr);
     gap: 10px;
     margin-bottom: 20px;
