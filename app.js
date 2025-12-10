@@ -1,25 +1,59 @@
 let taskData = []; 
 const STORAGE_KEY = 'maintenanceTrackerTasks';
-// Array to store the IDs of tasks that are currently visually struck through in this session
+const VISUAL_STATUS_KEY = 'trackerVisualStatus'; // New key for visual status
 let visuallyCompleted = []; 
+
+// --- Persistence ---
+function loadTasks() {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (stored) {
+        taskData = JSON.parse(stored);
+        taskData.forEach(t => {
+            if (!t.completionHistory) t.completionHistory = [];
+            if (typeof t.isOneTime === 'undefined') t.isOneTime = false;
+        });
+    }
+    loadVisualStatus(); // Load visual status when tasks are loaded
+}
+
+function loadVisualStatus() {
+    const stored = localStorage.getItem(VISUAL_STATUS_KEY);
+    if (stored) {
+        visuallyCompleted = JSON.parse(stored);
+    } else {
+        // If no visual status is saved, initialize it based on formally completed tasks today
+        const todayS = formatDate(new Date());
+        visuallyCompleted = taskData
+            .filter(t => t.lastCompleted === todayS)
+            .map(t => t.id);
+    }
+}
+
+function saveVisualStatus() { 
+    localStorage.setItem(VISUAL_STATUS_KEY, JSON.stringify(visuallyCompleted)); 
+}
+
+function saveTasks() { 
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(taskData));
+    saveVisualStatus(); // CRITICAL: Save visual status whenever tasks are saved
+}
 
 // --- Initialization ---
 function initTracker() {
     loadTasks();
-    // CRITICAL FIX: Ensure ALL loaded tasks have a unique, stable ID. 
     taskData.forEach((t, i) => {
         if (typeof t.id === 'undefined') {
-            t.id = Date.now() + i + Math.floor(Math.random() * 1000); // Assign a high, unique ID
+            t.id = Date.now() + i + Math.floor(Math.random() * 1000); 
         }
     });
     setupCalendarControls();
     registerFormListener();
     toggleCustomFrequency(); 
     sortTable('dueDate');
-    renderDashboard(); // Renders everything
+    renderDashboard(); 
 }
 
-// --- Utility & Date Helpers (omitted for brevity) ---
+// --- Utility & Date Helpers ---
 const getToday = () => new Date().setHours(0, 0, 0, 0);
 
 function formatDate(date) {
@@ -59,20 +93,7 @@ function getStatus(dueDate) {
     return { text: 'Upcoming', class: '', sortValue: diff };
 }
 
-// --- Persistence ---
-function loadTasks() {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored) {
-        taskData = JSON.parse(stored);
-        taskData.forEach(t => {
-            if (!t.completionHistory) t.completionHistory = [];
-            if (typeof t.isOneTime === 'undefined') t.isOneTime = false;
-        });
-    }
-}
-function saveTasks() { localStorage.setItem(STORAGE_KEY, JSON.stringify(taskData)); }
-
-// --- Calendar Logic (Guaranteed Renders) ---
+// --- Calendar Logic ---
 function setupCalendarControls() {
     const ms = document.getElementById('month-select'), ys = document.getElementById('year-select');
     if (!ms || !ys) return; 
@@ -175,7 +196,7 @@ window.renderCalendar = function() {
     }
 };
 
-// --- Modal Functions (Working) ---
+// --- Modal Functions ---
 window.openHistoryModal = () => { 
     const modal = document.getElementById('history-modal');
     if (modal) { modal.style.display = 'block'; renderHistoryModal(); }
@@ -229,7 +250,7 @@ function renderCompletedModal() {
     });
 }
 
-// --- Dashboard (FINAL STRIKE-THROUGH LOGIC) ---
+// --- Dashboard (Strike-Through Rendering) ---
 function renderNotepads() {
     const dl = document.getElementById('daily-tasks-list'), wl = document.getElementById('weekly-tasks-list');
     if (!dl || !wl) return; 
@@ -251,7 +272,7 @@ function renderNotepads() {
         if (!due || (t.isOneTime && t.frequencyDays === 0)) return;
         const ds = formatDate(due);
         
-        // CHECK VISUAL STATUS - Relies solely on the in-memory array
+        // CHECK VISUAL STATUS (Persistent)
         const isVisuallyComplete = visuallyCompleted.includes(t.id);
         const itemClass = isVisuallyComplete ? 'visually-complete' : '';
         const itemSymbol = isVisuallyComplete ? '✔️' : '◻️';
@@ -259,7 +280,7 @@ function renderNotepads() {
         // 1. Check if due TODAY
         if (ds === todayS) {
             dailyTasksCount++;
-            // This item toggles the strike-through visual status
+            // Button calls toggleStrikeThrough for persistence and unchecking
             const item = `<li class="${itemClass}"><span class="notepad-checkbox" onclick="toggleStrikeThrough(${t.id})">${itemSymbol}</span>${t.taskName}</li>`;
             dl.innerHTML += item;
         }
@@ -267,13 +288,11 @@ function renderNotepads() {
         // 2. Items for Weekly List
         if (due >= start && due <= end) {
              weeklyTasksCount++;
-             // This item toggles the strike-through visual status
              const item = `<li class="${itemClass}"><span class="notepad-checkbox" onclick="toggleStrikeThrough(${t.id})">${itemSymbol}</span>${t.taskName} (${ds})</li>`;
              wl.innerHTML += item;
         }
     });
 
-    // FINAL MESSAGE LOGIC
     if (dailyTasksCount === 0) {
         dl.innerHTML = '<li>🎉 Nothing scheduled for today!</li>';
     } 
@@ -292,7 +311,6 @@ function renderDashboard() {
         const status = getStatus(due);
         if (status.sortValue <= 30) {
             const row = document.createElement('tr'); row.className = status.class;
-            // Use t.id for actions instead of array index i
             row.innerHTML = `<td>${formatDate(due)}</td><td>${t.taskName}</td><td>${t.category}</td><td>${status.text}</td>
             <td><button onclick="markDone(${t.id})">Done</button> ${t.isOneTime?'':`<button class="skip-button" onclick="skipTask(${t.id})">Skip</button>`} <button class="delete-button" onclick="deleteTask(${t.id})">Delete</button></td>`;
             list.appendChild(row);
@@ -301,21 +319,20 @@ function renderDashboard() {
     renderCalendar(); renderNotepads(); saveTasks();
 }
 
-// --- NEW TOGGLE FUNCTION (Visual only) ---
+// --- NEW TOGGLE FUNCTION (Pure Visual Toggle with Persistence) ---
 window.toggleStrikeThrough = (taskId) => {
     const index = visuallyCompleted.indexOf(taskId);
     if (index === -1) {
-        // Mark visually complete
-        visuallyCompleted.push(taskId);
+        visuallyCompleted.push(taskId); // Check
     } else {
-        // Mark visually incomplete
-        visuallyCompleted.splice(index, 1);
+        visuallyCompleted.splice(index, 1); // Uncheck
     }
-    renderDashboard(); // Rerender post-its and dashboard
+    saveVisualStatus(); // Save the visual state for persistence
+    renderDashboard(); 
 }
 
 
-// --- Actions (MarkDone now only updates DB, used by table buttons) ---
+// --- Actions (MarkDone/MarkUndone - Formal Completion/Uncompletion via Table/History) ---
 window.markDone = (taskId) => {
     const t = taskData.find(task => task.id === taskId);
     if (!t) return;
@@ -330,9 +347,8 @@ window.markDone = (taskId) => {
 
     if (t.isOneTime) t.frequencyDays = 0;
     
-    // We update the visual status to ensure the post-it knows it's done
-    const index = visuallyCompleted.indexOf(taskId);
-    if (index === -1) {
+    // Ensure the visual status is also set to complete
+    if (!visuallyCompleted.includes(taskId)) {
         visuallyCompleted.push(taskId);
     }
     
@@ -385,11 +401,9 @@ window.skipTask = (taskId) => {
 
 window.deleteTask = (taskId) => {
     if (confirm("Permanently delete this task?")) { 
-        // Find task index in array by static ID
         const indexToDelete = taskData.findIndex(t => t.id === taskId);
         if (indexToDelete > -1) {
             taskData.splice(indexToDelete, 1);
-            // Re-index simple IDs for stability after deletion
             taskData.forEach((t, i) => t.id = i);
         }
         renderDashboard(); 
@@ -423,7 +437,6 @@ window.toggleFormVisibility = function() {
     }
 }
 
-
 // --- Form Handling ---
 function registerFormListener() {
     document.getElementById('task-form').onsubmit = (e) => {
@@ -431,7 +444,7 @@ function registerFormListener() {
         const fv = document.getElementById('frequencySelect').value;
         const oneTime = fv === 'single';
         let freq = oneTime ? 1 : (fv === 'custom' ? parseInt(document.getElementById('customDays').value) : parseInt(fv));
-        const inputDate = document.getElementById('dateInput').value; // Combined input
+        const inputDate = document.getElementById('dateInput').value; 
 
         let lastCompletedDate = '';
 
@@ -453,7 +466,7 @@ function registerFormListener() {
         const initialHistory = [];
 
         taskData.push({
-            id: Date.now() + Math.floor(Math.random() * 1000), // Assign unique ID on creation
+            id: Date.now() + Math.floor(Math.random() * 1000), 
             taskName: document.getElementById('taskName').value,
             category: document.getElementById('category').value,
             description: document.getElementById('description').value,
