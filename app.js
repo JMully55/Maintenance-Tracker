@@ -9,6 +9,8 @@ function loadTasks() {
         taskData.forEach(t => {
             if (!t.completionHistory) t.completionHistory = [];
             if (typeof t.isOneTime === 'undefined') t.isOneTime = false;
+            // Ensure new tasks have a fallback property
+            if (typeof t.initialLastCompleted === 'undefined') t.initialLastCompleted = t.lastCompleted;
         });
     }
 }
@@ -35,22 +37,17 @@ function initTracker() {
     const today = getToday();
     taskData = taskData.filter(t => {
         if (t.isOneTime) {
-            // Check if it has been completed at least once
             if (t.completionHistory && t.completionHistory.length > 0) {
-                // Calculate the task's single expected due date (which is one cycle after last completed)
                 const nextDue = calculateDueDate(t.lastCompleted, t.frequencyDays, t.isOneTime);
-                
-                // If the next due date has passed (it's officially over)
                 if (nextDue && nextDue.getTime() < today) {
-                    return false; // Filter this task out (delete it permanently)
+                    return false; 
                 }
             }
         }
-        return true; // Keep recurring tasks, and one-time tasks not yet completed/passed
+        return true; 
     });
-    saveTasks(); // Save the filtered list immediately
+    saveTasks(); 
     
-    // CRITICAL: Ensure setup runs before renderDashboard
     setupCalendarControls();
     registerFormListener();
     toggleCustomFrequency(); 
@@ -60,10 +57,9 @@ function initTracker() {
 }
 
 // --- Utility & Date Helpers ---
-// *** UTC FIX 1: All day comparisons must use the same timezone boundary. ***
 const getToday = () => {
     const d = new Date();
-    d.setHours(0, 0, 0, 0); // Set to local midnight
+    d.setHours(0, 0, 0, 0); 
     return d.getTime();
 };
 
@@ -80,10 +76,8 @@ function formatTimestamp(isoString) {
     return `${date.toLocaleDateString()} ${date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
 }
 
-// *** UTC FIX 2: Ensure all created dates are initialized without time components (local midnight) ***
 function createLocalDate(dateString) {
     const parts = dateString.split('-').map(p => parseInt(p, 10));
-    // YYYY, MM (0-indexed), DD. Creates date at local 00:00:00
     return new Date(parts[0], parts[1] - 1, parts[2]);
 }
 
@@ -100,22 +94,30 @@ function calculateDueDate(lastComp, freqDays, isOneTime) {
 
 function getStatus(dueDate) {
     if (!dueDate) return { text: 'N/A', class: '', sortValue: 1000 };
-    // Get difference between midnight due date and midnight today
     const diff = Math.ceil((dueDate.setHours(0,0,0,0) - getToday()) / 86400000);
     if (diff < 0) return { text: `OVERDUE (${Math.abs(diff)}d)`, class: 'status-overdue', sortValue: diff };
     if (diff <= 30) return { text: `DUE IN ${diff}d`, class: 'status-due', sortValue: diff };
     return { text: 'Upcoming', class: '', sortValue: diff };
 }
 
-// *** NEW/UPDATED UTILITY: Anchor for Stable Calendar Recurrence ***
+// *** CRITICAL FIX FOR CALENDAR STABILITY: Use a permanent anchor date. ***
 function getScheduleAnchorDate(task) {
     if (task.completionHistory && task.completionHistory.length > 0) {
+        // Anchor to the date one cycle BEFORE the oldest actual recorded completion.
         const firstCompletion = task.completionHistory[0].dateOnly;
         const firstDate = createLocalDate(firstCompletion);
         firstDate.setDate(firstDate.getDate() - task.frequencyDays);
         return firstDate;
     }
     
+    // --- FINAL FALLBACK LOGIC ---
+    
+    // 1. If history is empty, anchor to the original date input during task creation.
+    if (task.initialLastCompleted) {
+        return createLocalDate(task.initialLastCompleted);
+    }
+    
+    // 2. Default fallback if task is missing all date context.
     if (task.lastCompleted) {
         return createLocalDate(task.lastCompleted);
     }
@@ -124,9 +126,10 @@ function getScheduleAnchorDate(task) {
     const fallbackAnchor = new Date(now.getFullYear(), 0, 1); 
     fallbackAnchor.setDate(fallbackAnchor.getDate() - task.frequencyDays);
     return fallbackAnchor;
+    // --- END FINAL FALLBACK LOGIC ---
 }
 
-// --- Calendar Logic (Permanent Schedule - FINAL FIX) ---
+// --- Calendar Logic ---
 function setupCalendarControls() {
     const ms = document.getElementById('month-select'), ys = document.getElementById('year-select');
     if (!ms || !ys) return; 
@@ -156,41 +159,36 @@ function getRecurringDueDates(task, mStart, mEnd) {
         return events;
     }
 
-    // --- CRITICAL FIX FOR STABLE PERMANENT CALENDAR DISPLAY ---
+    // --- CRITICAL RECURRENCE CALCULATION ---
     
     const msPerDay = 86400000;
     
-    // 1. Get the stable historical anchor date for the schedule.
     const anchorDate = getScheduleAnchorDate(task);
-    anchorDate.setHours(0, 0, 0, 0); // Ensure anchor is local midnight
+    anchorDate.setHours(0, 0, 0, 0); 
 
-    // 2. Calculate the difference in days between the anchor date and the calendar's start date (mStart).
     const mStartMidnight = mStart.getTime(); 
     const anchorMidnight = anchorDate.getTime(); 
     
-    // *** CRITICAL FIX FOR DAY SHIFT: Use Math.round for robust day counting ***
+    // Use Math.round to handle floating point issues caused by time zones/DST
     const daysSinceAnchor = Math.round((mStartMidnight - anchorMidnight) / msPerDay);
     
-    // 3. Calculate the number of full cycles elapsed to get from anchorDate to a point *just before* mStart.
     const cyclesElapsed = Math.floor(daysSinceAnchor / frequency);
     
-    // 4. Set currentDate to the first recurrence date that occurred *just before* mStart.
     let currentDate = new Date(anchorDate);
     currentDate.setHours(0, 0, 0, 0); 
     
     currentDate.setDate(currentDate.getDate() + (cyclesElapsed * frequency));
 
-    // 5. Advance one more cycle to ensure we start plotting ON or AFTER mStart.
+    // Advance one more cycle to ensure we start plotting ON or AFTER mStart.
     currentDate.setDate(currentDate.getDate() + frequency);
     currentDate.setHours(0, 0, 0, 0); 
-    // --- END CRITICAL FIX ---
+    // --- END CRITICAL RECURRENCE CALCULATION ---
 
 
     while (currentDate.getTime() <= mEnd.getTime()) {
         
         const dateString = formatDate(currentDate);
         
-        // This plot logic always runs if we are in the calendar's viewable range
         if (currentDate.getTime() >= mStart.getTime()) {
              events[dateString] = { 
                 name: task.taskName + (task.isOneTime ? ' (1-Time)':''), 
@@ -309,7 +307,7 @@ function renderCompletedModal() {
     });
 }
 
-// --- Dashboard Rendering (Updated to use new Notepad structure) ---
+// --- Dashboard Rendering ---
 function renderNotepads() {
     const dl = document.getElementById('daily-tasks-list'), wl = document.getElementById('weekly-tasks-list');
     if (!dl || !wl) return; 
@@ -330,7 +328,6 @@ function renderNotepads() {
     taskData.forEach((t) => {
         if (t.isOneTime && t.frequencyDays === 0) return;
 
-        // 1. Calculate the 'Expected' Due Date based on the LAST recorded completion
         const lastCompDate = t.lastCompleted;
         const frequency = t.frequencyDays;
         
@@ -338,7 +335,6 @@ function renderNotepads() {
         if (lastCompDate) {
             expectedDue = calculateDueDate(lastCompDate, frequency, t.isOneTime);
         } else {
-            // For tasks with no history, they are immediately 'due'.
             expectedDue = now; 
         }
 
@@ -346,23 +342,19 @@ function renderNotepads() {
 
         const expectedDueS = formatDate(expectedDue);
         
-        // Check 1: Has this task already been marked complete TODAY?
         const isCompletedToday = lastCompDate === todayS; 
 
-        // Check 2: Is the task due today or past due?
         const isCurrentlyDueToday = expectedDueS === todayS || expectedDue.getTime() < getToday();
 
-        // Check 3: Is the task due this week (within the notepad timeframe)?
         const isDueThisWeek = expectedDue >= start && expectedDue <= end;
 
 
-        // Determine Visual State and Action
         const itemClass = isCompletedToday ? 'visually-complete' : '';
         const itemSymbol = isCompletedToday ? '✔️' : '◻️';
         const action = isCompletedToday ? `markUndone` : `markDone`;
 
         // ----------------------------------------------------------------------
-        // DAILY TASK LIST LOGIC (Stays visible if due today or completed today)
+        // DAILY TASK LIST LOGIC
         if (isCurrentlyDueToday || isCompletedToday) { 
             dailyTasksCount++;
             const item = `<li class="${itemClass}"><span class="notepad-checkbox" onclick="${action}(${t.id})">${itemSymbol}</span>${t.taskName}</li>`;
@@ -373,7 +365,6 @@ function renderNotepads() {
         // WEEKLY TASK LIST LOGIC
         if (isDueThisWeek || isCompletedToday) {
              weeklyTasksCount++;
-             // Use expected due date unless it was completed today (then use today's date for display consistency)
              const dueDisplay = isCompletedToday ? todayS : expectedDueS; 
              const item = `<li class="${itemClass}"><span class="notepad-checkbox" onclick="${action}(${t.id})">${itemSymbol}</span>${t.taskName} (${dueDisplay})</li>`;
              wl.innerHTML += item;
@@ -390,11 +381,9 @@ function renderNotepads() {
 }
 
 function renderDashboard() {
-    // Renders the new "Action Board" notepad (previously the table)
     const list = document.getElementById('coming-up-list'); if (!list) return;
     list.innerHTML = '';
     
-    // Sort tasks by due date (ascending)
     taskData.sort((a,b) => {
         const dueA = calculateDueDate(a.lastCompleted, a.frequencyDays, a.isOneTime);
         const dueB = calculateDueDate(b.lastCompleted, b.frequencyDays, b.isOneTime);
@@ -409,15 +398,12 @@ function renderDashboard() {
         
         const status = getStatus(due);
         
-        // Only render tasks due/overdue within 30 days
         if (status.sortValue <= 30) {
             
             const dueDisplay = formatDate(due);
             
-            // Determine overdue color/status
             const statusColor = status.class === 'status-overdue' ? '#a94442' : '#333';
             
-            // Build the action buttons
             const skipButton = t.isOneTime ? '' : `<button class="skip-btn" onclick="skipTask(${t.id})">Skip</button>`;
             
             const actions = `
@@ -458,13 +444,11 @@ window.markDone = (taskId) => {
     const now = new Date();
     const todayFormatted = formatDate(now);
 
-    // Prevent duplicate history entry if already marked done today
     if (t.lastCompleted === todayFormatted) {
         renderDashboard();
         return; 
     }
     
-    // Formal Completion: Updates DB and fixes overdue issue
     t.completionHistory.push({ timestamp: now.toISOString(), dateOnly: todayFormatted });
     t.lastCompleted = todayFormatted;
 
@@ -547,7 +531,7 @@ window.toggleFormVisibility = function() {
 }
 
 
-// --- Form Handling (FIXED to manually clear fields) ---
+// --- Form Handling (FIXED to manually clear fields and preserve anchor) ---
 function registerFormListener() {
     document.getElementById('task-form').onsubmit = (e) => {
         e.preventDefault();
@@ -582,6 +566,7 @@ function registerFormListener() {
             description: document.getElementById('description').value,
             frequencyDays: freq, 
             lastCompleted: lastCompletedDate, 
+            initialLastCompleted: lastCompletedDate, // *** Store the permanent anchor ***
             isOneTime: oneTime, 
             completionHistory: initialHistory 
         });
