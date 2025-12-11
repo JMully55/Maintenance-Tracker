@@ -131,31 +131,21 @@ function getRecurringDueDates(task, mStart, mEnd) {
         return events;
     }
 
-    // --- CRITICAL FIX FOR PERMANENT CALENDAR DISPLAY ---
-    // This logic ensures the calendar shows ALL recurrence points, 
-    // regardless of when the task was last completed or uncompleted.
+    // --- CRITICAL FIX FOR STABLE PERMANENT CALENDAR DISPLAY ---
     
-    // 1. Determine the task's starting reference point (one cycle BEFORE last completion).
-    const lastDate = createLocalDate(task.lastCompleted);
-    const initialLastCompletedDate = createLocalDate(task.lastCompleted);
-    const initialFrequency = task.frequencyDays;
-    
-    let anchorDate = new Date(initialLastCompletedDate);
-    anchorDate.setDate(initialLastCompletedDate.getDate() - initialFrequency); 
-    
-    // 2. Calculate the difference in days between the anchor date and the calendar's start date (mStart).
-    const daysSinceAnchor = Math.floor((mStart.getTime() - anchorDate.getTime()) / 86400000);
-
-    // 3. Calculate the number of full cycles elapsed to get from anchorDate to a point *just before* mStart.
-    const cyclesElapsed = Math.floor(daysSinceAnchor / frequency);
-    
-    // 4. Set currentDate to the first recurrence date that occurred *just before* mStart.
-    let currentDate = new Date(anchorDate);
-    currentDate.setDate(anchorDate.getDate() + (cyclesElapsed * frequency));
-
-    // 5. Advance one more cycle to ensure we start plotting ON or AFTER mStart.
-    currentDate.setDate(currentDate.getDate() + frequency);
+    // 1. Calculate the theoretical first recurrence date using the last completed date.
+    let currentDate = calculateDueDate(task.lastCompleted, frequency, task.isOneTime);
     currentDate.setHours(0, 0, 0, 0); 
+    
+    // 2. We need to find the specific recurrence cycle that falls *ON* or *BEFORE* mStart.
+    // We repeatedly subtract the frequency until we hit a date before the calendar view starts.
+    while (currentDate.getTime() >= mStart.getTime()) {
+        currentDate.setDate(currentDate.getDate() - frequency);
+    }
+    
+    // 3. Advance one cycle forward to ensure we start plotting the schedule ON or AFTER mStart.
+    currentDate.setDate(currentDate.getDate() + frequency);
+    
     // --- END CRITICAL FIX ---
 
 
