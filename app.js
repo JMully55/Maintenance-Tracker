@@ -78,9 +78,12 @@ function formatTimestamp(isoString) {
     return `${date.toLocaleDateString()} ${date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
 }
 
+// *** FINAL FIX: Robust local date creation for dashboard lists ***
 function createLocalDate(dateString) {
     const parts = dateString.split('-').map(p => parseInt(p, 10));
-    return new Date(parts[0], parts[1] - 1, parts[2]);
+    const d = new Date(parts[0], parts[1] - 1, parts[2]);
+    d.setHours(0, 0, 0, 0); // Force local midnight cleanly
+    return d;
 }
 
 function createUTCDate(dateString) {
@@ -92,7 +95,7 @@ function createUTCDate(dateString) {
 // Function for simple, volatile due date calculation (used by dashboard list display)
 function calculateDueDateFromLastCompleted(lastComp, freqDays) {
     if (!lastComp) return null;
-    const lastDate = createLocalDate(lastComp);
+    const lastDate = createLocalDate(lastComp); // Uses robust local date creation
     const nextDate = new Date(lastDate);
     const frequency = parseInt(freqDays);
     if (isNaN(frequency)) return null;
@@ -165,7 +168,7 @@ function getRecurringDueDates(task, mStart, mEnd) {
         return events;
     }
 
-    // --- FINAL FIX: FORCE RECURRENCE BASED ON TARGET DAY OF WEEK (DOW) ---
+    // --- CRITICAL RECURRENCE CALCULATION FIX ---
     
     const msPerDay = 86400000;
     
@@ -179,19 +182,18 @@ function getRecurringDueDates(task, mStart, mEnd) {
     let currentDate = new Date(mStart);
     currentDate.setHours(0, 0, 0, 0);
     
-    const startDayOfWeek = currentDate.getDay(); 
+    const startDayOfWeek = currentDate.getDay(); // Day of the week of mStart
     const dayDiff = (targetDOW - startDayOfWeek + 7) % 7;
     currentDate.setDate(currentDate.getDate() + dayDiff);
-    currentDate.setHours(0, 0, 0, 0); 
+    currentDate.setHours(0, 0, 0, 0); // Re-align after setDate
     
     // 3. If the starting date is before the target date, advance to the first valid scheduled date.
-    // This solves both the "Initial Day Missing" problem and the calendar shift.
     while (currentDate.getTime() < targetDueTime) {
         currentDate.setDate(currentDate.getDate() + frequency);
         currentDate.setHours(0, 0, 0, 0);
     }
-
-    // --- END FINAL FIX ---
+    
+    // --- END CRITICAL RECURRENCE CALCULATION FIX ---
 
     while (currentDate.getTime() <= mEnd.getTime()) {
         
