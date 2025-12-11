@@ -30,6 +30,27 @@ function initTracker() {
             t.id = Date.now() + i + Math.floor(Math.random() * 1000); 
         }
     });
+    
+    // *** FIX: Remove completed one-time tasks whose due date has passed ***
+    const today = getToday();
+    taskData = taskData.filter(t => {
+        if (t.isOneTime) {
+            // Check if it has been completed at least once
+            if (t.completionHistory && t.completionHistory.length > 0) {
+                // Calculate the task's single expected due date
+                const nextDue = calculateDueDate(t.lastCompleted, t.frequencyDays, t.isOneTime);
+                
+                // If the next due date has passed (it's officially over)
+                if (nextDue && nextDue.getTime() < today) {
+                    return false; // Filter this task out (delete it permanently)
+                }
+            }
+        }
+        return true; // Keep recurring tasks, and one-time tasks not yet completed/passed
+    });
+    saveTasks(); // Save the filtered list immediately
+    // *** END FIX ***
+    
     // CRITICAL: Ensure setup runs before renderDashboard
     setupCalendarControls();
     registerFormListener();
@@ -102,7 +123,7 @@ function getRecurringDueDates(task, mStart, mEnd) {
     if (isNaN(frequency) || frequency <= 0) {
         if(task.isOneTime && frequency === 1) {
             const nextDueDate = calculateDueDate(task.lastCompleted, 1, true);
-            if (nextDueDate >= mStart && nextDueDate <= mEnd) {
+            if (nextDueDate && nextDueDate >= mStart && nextDueDate <= mEnd) {
                  events[formatDate(nextDueDate)] = { name: `${task.taskName} (1-Time)`, overdue: nextDueDate.getTime() < getToday() };
             }
             return events;
@@ -110,17 +131,21 @@ function getRecurringDueDates(task, mStart, mEnd) {
         return events;
     }
 
+    // 1. Determine the first potential recurring due date *after* the last completion.
     let currentDate = calculateDueDate(task.lastCompleted, frequency, task.isOneTime);
     
     if (!currentDate) return events;
     currentDate.setHours(0, 0, 0, 0); 
     
-    if (currentDate.getTime() < mStart.getTime() && !task.isOneTime) {
+    // 2. If the first upcoming date is before the start of the calendar view,
+    //    advance the date by skipping cycles until it lands inside or just before the view.
+    if (currentDate.getTime() < mStart.getTime()) {
         const daysDiff = Math.ceil((mStart.getTime() - currentDate.getTime()) / 86400000);
         const cyclesToSkip = Math.ceil(daysDiff / frequency);
         currentDate.setDate(currentDate.getDate() + cyclesToSkip * frequency);
     }
     
+    // 3. Now, iterate forward through the calendar range.
     while (currentDate.getTime() <= mEnd.getTime()) {
         
         if (currentDate.getTime() >= mStart.getTime()) {
@@ -360,7 +385,8 @@ window.markDone = (taskId) => {
     t.completionHistory.push({ timestamp: now.toISOString(), dateOnly: todayFormatted });
     t.lastCompleted = todayFormatted;
 
-    if (t.isOneTime) t.frequencyDays = 0;
+    // *** FIX: REMOVED the line that set t.frequencyDays = 0 for one-time tasks ***
+    // The initTracker cleanup handles deletion only when the next due date passes.
     
     renderDashboard();
 };
@@ -385,7 +411,7 @@ window.markUndone = (taskId) => {
         t.lastCompleted = '';
     }
 
-    // 3. Revert one-time status 
+    // 3. Revert one-time status (if applicable and necessary)
     if (t.isOneTime && t.frequencyDays === 0) {
         t.frequencyDays = 1; 
     }
