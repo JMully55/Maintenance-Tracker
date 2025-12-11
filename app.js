@@ -10,7 +10,6 @@ function loadTasks() {
             if (!t.completionHistory) t.completionHistory = [];
             if (typeof t.isOneTime === 'undefined') t.isOneTime = false;
             if (typeof t.initialLastCompleted === 'undefined') t.initialLastCompleted = t.lastCompleted;
-            // Ensure task has the target due date for the calendar floor
             if (typeof t.targetDueDate === 'undefined') {
                 t.targetDueDate = calculateDueDate(t.lastCompleted, t.frequencyDays, t.isOneTime);
                 if (t.targetDueDate) t.targetDueDate = formatDate(t.targetDueDate);
@@ -191,6 +190,7 @@ function getRecurringDueDates(task, mStart, mEnd) {
         
         const dateString = formatDate(currentDate);
         
+        // Only plot if the date is within the calendar view AND is not a historical date before the user's intended start date.
         if (currentDate.getTime() >= mStart.getTime() && currentDate.getTime() >= targetDueTime) {
              events[dateString] = { 
                 name: task.taskName + (task.isOneTime ? ' (1-Time)':''), 
@@ -354,8 +354,8 @@ function renderNotepads() {
         const action = isCompletedToday ? `markUndone` : `markDone`;
 
         // ----------------------------------------------------------------------
-        // DAILY TASK LIST LOGIC: ONLY show if DUE TODAY or OVERDUE (regardless of completion)
-        if (isCurrentlyDueToday) { 
+        // DAILY TASK LIST LOGIC: Keep task visible IF it's due today/overdue OR if it was just completed today.
+        if (isCurrentlyDueToday || isCompletedToday) { 
             dailyTasksCount++;
             const item = `<li class="${itemClass}"><span class="notepad-checkbox" onclick="${action}(${t.id})">${itemSymbol}</span>${t.taskName}</li>`;
             dl.innerHTML += item;
@@ -571,7 +571,7 @@ function registerFormListener() {
             frequencyDays: freq, 
             lastCompleted: lastCompletedDate, 
             initialLastCompleted: lastCompletedDate, // Permanent anchor
-            targetDueDate: targetDueS, // **New property for calendar floor**
+            targetDueDate: targetDueS, // New property for calendar floor
             isOneTime: oneTime, 
             completionHistory: initialHistory 
         });
