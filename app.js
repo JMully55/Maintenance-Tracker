@@ -100,6 +100,20 @@ function getStatus(dueDate) {
     return { text: 'Upcoming', class: '', sortValue: diff };
 }
 
+// *** NEW UTILITY: Anchor for Stable Calendar Recurrence ***
+function getScheduleAnchorDate(task) {
+    if (task.completionHistory && task.completionHistory.length > 0) {
+        // Find the oldest completion date in the history (the true schedule start)
+        const firstCompletion = task.completionHistory[0].dateOnly;
+        // Calculate the theoretical date BEFORE the first completion
+        const firstDate = createLocalDate(firstCompletion);
+        firstDate.setDate(firstDate.getDate() - task.frequencyDays);
+        return firstDate;
+    }
+    // If no history, assume the schedule starts from the task's lastCompleted date (or next target date).
+    return createLocalDate(task.lastCompleted) || new Date();
+}
+
 // --- Calendar Logic (Permanent Schedule - FINAL FIX) ---
 function setupCalendarControls() {
     const ms = document.getElementById('month-select'), ys = document.getElementById('year-select');
@@ -133,19 +147,22 @@ function getRecurringDueDates(task, mStart, mEnd) {
 
     // --- CRITICAL FIX FOR STABLE PERMANENT CALENDAR DISPLAY ---
     
-    // 1. Calculate the theoretical first recurrence date using the last completed date.
-    let currentDate = calculateDueDate(task.lastCompleted, frequency, task.isOneTime);
-    currentDate.setHours(0, 0, 0, 0); 
+    // 1. Get the stable historical anchor date for the schedule.
+    const anchorDate = getScheduleAnchorDate(task);
     
-    // 2. We need to find the specific recurrence cycle that falls *ON* or *BEFORE* mStart.
-    // We repeatedly subtract the frequency until we hit a date before the calendar view starts.
-    while (currentDate.getTime() >= mStart.getTime()) {
-        currentDate.setDate(currentDate.getDate() - frequency);
-    }
+    // 2. Calculate the difference in days between the anchor date and the calendar's start date (mStart).
+    const daysSinceAnchor = Math.floor((mStart.getTime() - anchorDate.getTime()) / 86400000);
+
+    // 3. Calculate the number of full cycles elapsed to get from anchorDate to a point *just before* mStart.
+    const cyclesElapsed = Math.floor(daysSinceAnchor / frequency);
     
-    // 3. Advance one cycle forward to ensure we start plotting the schedule ON or AFTER mStart.
+    // 4. Set currentDate to the first recurrence date that occurred *just before* mStart.
+    let currentDate = new Date(anchorDate);
+    currentDate.setDate(anchorDate.getDate() + (cyclesElapsed * frequency));
+
+    // 5. Advance one more cycle to ensure we start plotting ON or AFTER mStart.
     currentDate.setDate(currentDate.getDate() + frequency);
-    
+    currentDate.setHours(0, 0, 0, 0); 
     // --- END CRITICAL FIX ---
 
 
