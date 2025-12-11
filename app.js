@@ -40,7 +40,6 @@ function initTracker() {
     taskData = taskData.filter(t => {
         if (t.isOneTime) {
             if (t.completionHistory && t.completionHistory.length > 0) {
-                // Use the standard due date calculation for filtering one-time tasks
                 const nextDue = calculateDueDateFromLastCompleted(t.lastCompleted, t.frequencyDays);
                 if (nextDue && nextDue.getTime() < today) {
                     return false; 
@@ -84,10 +83,9 @@ function createLocalDate(dateString) {
     return new Date(parts[0], parts[1] - 1, parts[2]);
 }
 
-// *** NEW UTC-BASED DATE CREATION FOR STABLE ANCHOR ***
+// *** UTC-BASED DATE CREATION FOR STABLE ANCHOR (Used by calendar logic) ***
 function createUTCDate(dateString) {
     const parts = dateString.split('-').map(p => parseInt(p, 10));
-    // YYYY, MM (0-indexed), DD. Creates date at UTC 00:00:00, which avoids local timezone offset
     return new Date(Date.UTC(parts[0], parts[1] - 1, parts[2]));
 }
 
@@ -123,7 +121,6 @@ function getScheduleAnchorDate(task) {
     // 1. Anchor to the date one cycle BEFORE the oldest actual recorded completion.
     if (task.completionHistory && task.completionHistory.length > 0) {
         const firstCompletion = task.completionHistory[0].dateOnly;
-        // Use UTC date creation for anchor
         const firstDate = createUTCDate(firstCompletion);
         firstDate.setUTCDate(firstDate.getUTCDate() - frequency);
         return firstDate;
@@ -131,13 +128,12 @@ function getScheduleAnchorDate(task) {
     
     // 2. If history is empty, anchor to the permanent initial date input (which is initialLastCompleted).
     if (task.initialLastCompleted) {
-        // Use UTC date creation for anchor
         const initialAnchor = createUTCDate(task.initialLastCompleted);
-        initialAnchor.setUTCDate(initialAnchor.getUTCDate()); // already one cycle back
+        initialAnchor.setUTCDate(initialAnchor.getUTCDate()); 
         return initialAnchor;
     }
     
-    // 3. Default fallback if task is missing all date context.
+    // 3. Default fallback 
     if (task.lastCompleted) {
         return createLocalDate(task.lastCompleted);
     }
@@ -168,7 +164,7 @@ function getRecurringDueDates(task, mStart, mEnd) {
     
     const frequency = parseInt(task.frequencyDays);
     if (isNaN(frequency) || frequency <= 0) {
-        if(task.isOneTime && frequency === 1 && task.lastCompleted) {
+        if(task.isOneTime && task.lastCompleted) {
             const nextDueDate = calculateDueDate(task.lastCompleted, 1);
             if (nextDueDate && nextDueDate >= mStart && nextDueDate <= mEnd) {
                  events[formatDate(nextDueDate)] = { name: `${task.taskName} (1-Time)`, overdue: nextDueDate.getTime() < getToday() };
@@ -178,38 +174,39 @@ function getRecurringDueDates(task, mStart, mEnd) {
         return events;
     }
 
-    // --- CRITICAL RECURRENCE CALCULATION (Modified for stability) ---
+    // --- CRITICAL RECURRENCE CALCULATION FIX ---
     
     const msPerDay = 86400000;
     
+    // The anchor is the day BEFORE the recurrence starts
     const anchorDate = getScheduleAnchorDate(task);
-    // Use the stored anchor date's time value (which is UTC 00:00:00 if created with createUTCDate)
+    
+    // The target is the day the recurrence SHOULD START (or did start)
+    const targetDueDate = createLocalDate(task.targetDueDate);
+
+    // 1. Calculate the initial plotting point for the calendar view (mStart)
     const anchorTime = anchorDate.getTime();
-    
-    // Calculate the difference between calendar start and anchor using clean day count
     const daysSinceAnchor = Math.round((mStart.getTime() - anchorTime) / msPerDay);
-    
     const cyclesElapsed = Math.floor(daysSinceAnchor / frequency);
     
-    // Start date is anchor time + elapsed cycles
+    // Calculate the time of the recurrence cycle that falls *just before* mStart
     let startTime = anchorTime + (cyclesElapsed * frequency * msPerDay);
     
     // Advance one more cycle to ensure we start plotting ON or AFTER mStart.
     startTime += (frequency * msPerDay);
     
     let currentDate = new Date(startTime);
-    currentDate.setHours(0, 0, 0, 0); // Re-align to local midnight for plotting
+    currentDate.setHours(0, 0, 0, 0); 
+    
+    // --- END CRITICAL RECURRENCE CALCULATION FIX ---
 
-    // --- END CRITICAL RECURRENCE CALCULATION ---
-
-    const targetDueTime = task.targetDueDate ? createLocalDate(task.targetDueDate).getTime() : 0;
+    const targetDueTime = targetDueDate.getTime();
 
     while (currentDate.getTime() <= mEnd.getTime()) {
         
         const dateString = formatDate(currentDate);
         
-        // Only plot if the date is within the calendar view AND is not a historical date before the user's intended start date.
-        // NOTE: targetDueTime is also local midnight due to createLocalDate
+        // Only plot if the date is within the calendar view AND is on or after the user's initial Target Day.
         if (currentDate.getTime() >= mStart.getTime() && currentDate.getTime() >= targetDueTime) {
              events[dateString] = { 
                 name: task.taskName + (task.isOneTime ? ' (1-Time)':''), 
@@ -350,7 +347,6 @@ function renderNotepads() {
 
         const lastCompDate = t.lastCompleted;
         
-        // Use the volatile due date calculation for list display (as expected)
         let expectedDue = calculateDueDate(lastCompDate, t.frequencyDays);
         
         if (!expectedDue) return;
