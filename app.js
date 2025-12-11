@@ -110,16 +110,19 @@ function getScheduleAnchorDate(task) {
         return firstDate;
     }
     
-    // --- FIX START: Use a non-shifting historical anchor if history is empty ---
-    // This prevents the calendar schedule from jumping to 'today' when a task is marked undone
-    // and its history is cleared, which would make the recurrence pattern disappear.
+    // --- FIX: Use the original input date as a non-shifting anchor if history is empty ---
+    // Since the original input date is calculated to be 'one cycle before the first expected due date',
+    // we use that value (stored in lastCompleted) if it exists. Otherwise, fall back to current year.
+    if (task.lastCompleted) {
+        return createLocalDate(task.lastCompleted);
+    }
+    
+    // True fallback if task is brand new and lastCompleted was never set or cleared
     const now = new Date();
-    // Anchor to Jan 1st of the current year
     const fallbackAnchor = new Date(now.getFullYear(), 0, 1); 
-    // Push this anchor back by one cycle so the first recurrence hits on or after Jan 1st
     fallbackAnchor.setDate(fallbackAnchor.getDate() - task.frequencyDays);
     return fallbackAnchor;
-    // --- FIX END ---
+    // --- END FIX ---
 }
 
 // --- Calendar Logic (Permanent Schedule - FINAL FIX) ---
@@ -139,11 +142,15 @@ function setupCalendarControls() {
 function getRecurringDueDates(task, mStart, mEnd) {
     const events = {};
     if (task.isOneTime && task.frequencyDays === 0) return events;
-    if (!task.lastCompleted) return events;
+    
+    // *** CRITICAL FIX: Removed the short-circuit check: if (!task.lastCompleted) return events;
+    // This allows the calendar to use the stable anchor calculation (below) even if 
+    // lastCompleted is temporarily cleared by markUndone.
     
     const frequency = parseInt(task.frequencyDays);
     if (isNaN(frequency) || frequency <= 0) {
-        if(task.isOneTime && frequency === 1) {
+        // Handle single event logic specifically if it exists, otherwise return
+        if(task.isOneTime && frequency === 1 && task.lastCompleted) {
             const nextDueDate = calculateDueDate(task.lastCompleted, 1, true);
             if (nextDueDate && nextDueDate >= mStart && nextDueDate <= mEnd) {
                  events[formatDate(nextDueDate)] = { name: `${task.taskName} (1-Time)`, overdue: nextDueDate.getTime() < getToday() };
