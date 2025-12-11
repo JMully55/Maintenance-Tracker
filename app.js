@@ -11,7 +11,7 @@ function loadTasks() {
             if (typeof t.isOneTime === 'undefined') t.isOneTime = false;
             if (typeof t.initialLastCompleted === 'undefined') t.initialLastCompleted = t.lastCompleted;
             if (typeof t.targetDueDate === 'undefined') {
-                t.targetDueDate = calculateDueDateFromLastCompleted(t.lastCompleted, t.frequencyDays, t.isOneTime);
+                t.targetDueDate = calculateDueDateFromLastCompleted(t.lastCompleted, t.frequencyDays);
                 if (t.targetDueDate) t.targetDueDate = formatDate(t.targetDueDate);
             }
         });
@@ -40,8 +40,8 @@ function initTracker() {
     taskData = taskData.filter(t => {
         if (t.isOneTime) {
             if (t.completionHistory && t.completionHistory.length > 0) {
-                // Use the stable calculation here
-                const nextDue = calculateNextExpectedDueDate(t);
+                // Use the standard due date calculation for filtering one-time tasks
+                const nextDue = calculateDueDateFromLastCompleted(t.lastCompleted, t.frequencyDays);
                 if (nextDue && nextDue.getTime() < today) {
                     return false; 
                 }
@@ -84,7 +84,15 @@ function createLocalDate(dateString) {
     return new Date(parts[0], parts[1] - 1, parts[2]);
 }
 
-// --- Old calculation function, kept only for initialization/legacy conversion if needed ---
+// *** NEW UTC-BASED DATE CREATION FOR STABLE ANCHOR ***
+function createUTCDate(dateString) {
+    const parts = dateString.split('-').map(p => parseInt(p, 10));
+    // YYYY, MM (0-indexed), DD. Creates date at UTC 00:00:00, which avoids local timezone offset
+    return new Date(Date.UTC(parts[0], parts[1] - 1, parts[2]));
+}
+
+
+// Function for simple, volatile due date calculation (used by dashboard list display)
 function calculateDueDateFromLastCompleted(lastComp, freqDays) {
     if (!lastComp) return null;
     const lastDate = createLocalDate(lastComp);
@@ -96,25 +104,8 @@ function calculateDueDateFromLastCompleted(lastComp, freqDays) {
     return nextDate;
 }
 
-// *** NEW CORE LOGIC: Calculate Next Due Date from Permanent Anchor ***
-window.calculateNextExpectedDueDate = function(task) {
-    const frequency = parseInt(task.frequencyDays);
-    if (isNaN(frequency) || frequency <= 0) return null;
-    
-    // 1. Get the latest completion date
-    let lastCompletion = task.lastCompleted;
-    if (!lastCompletion) {
-         // If never completed, use the initial anchor date + one cycle to get the first due date.
-         const initialAnchor = getScheduleAnchorDate(task);
-         initialAnchor.setDate(initialAnchor.getDate() + frequency);
-         return initialAnchor;
-    }
-    
-    // 2. Calculate next date normally based on the last recorded completion.
-    return calculateDueDateFromLastCompleted(lastCompletion, frequency);
-}
-// Renaming the global reference used by the Dashboard
-window.calculateDueDate = window.calculateNextExpectedDueDate;
+// Function alias used by all dashboard components
+window.calculateDueDate = window.calculateDueDateFromLastCompleted;
 
 
 function getStatus(dueDate) {
@@ -125,26 +116,35 @@ function getStatus(dueDate) {
     return { text: 'Upcoming', class: '', sortValue: diff };
 }
 
-// *** CRITICAL FIX FOR CALENDAR STABILITY: Use a permanent anchor date. ***
+// *** CRITICAL FIX: Use UTC-based date creation for the calendar anchor. ***
 function getScheduleAnchorDate(task) {
+    const frequency = task.frequencyDays;
+    
+    // 1. Anchor to the date one cycle BEFORE the oldest actual recorded completion.
     if (task.completionHistory && task.completionHistory.length > 0) {
         const firstCompletion = task.completionHistory[0].dateOnly;
-        const firstDate = createLocalDate(firstCompletion);
-        firstDate.setDate(firstDate.getDate() - task.frequencyDays);
+        // Use UTC date creation for anchor
+        const firstDate = createUTCDate(firstCompletion);
+        firstDate.setUTCDate(firstDate.getUTCDate() - frequency);
         return firstDate;
     }
     
+    // 2. If history is empty, anchor to the permanent initial date input (which is initialLastCompleted).
     if (task.initialLastCompleted) {
-        return createLocalDate(task.initialLastCompleted);
+        // Use UTC date creation for anchor
+        const initialAnchor = createUTCDate(task.initialLastCompleted);
+        initialAnchor.setUTCDate(initialAnchor.getUTCDate()); // already one cycle back
+        return initialAnchor;
     }
     
+    // 3. Default fallback if task is missing all date context.
     if (task.lastCompleted) {
         return createLocalDate(task.lastCompleted);
     }
     
     const now = new Date();
     const fallbackAnchor = new Date(now.getFullYear(), 0, 1); 
-    fallbackAnchor.setDate(fallbackAnchor.getDate() - task.frequencyDays);
+    fallbackAnchor.setDate(fallbackAnchor.getDate() - frequency);
     return fallbackAnchor;
 }
 
@@ -169,8 +169,7 @@ function getRecurringDueDates(task, mStart, mEnd) {
     const frequency = parseInt(task.frequencyDays);
     if (isNaN(frequency) || frequency <= 0) {
         if(task.isOneTime && frequency === 1 && task.lastCompleted) {
-            // Use the anchor-based calculation for one-time events as well for consistency
-            const nextDueDate = calculateNextExpectedDueDate(task);
+            const nextDueDate = calculateDueDate(task.lastCompleted, 1);
             if (nextDueDate && nextDueDate >= mStart && nextDueDate <= mEnd) {
                  events[formatDate(nextDueDate)] = { name: `${task.taskName} (1-Time)`, overdue: nextDueDate.getTime() < getToday() };
             }
@@ -179,32 +178,30 @@ function getRecurringDueDates(task, mStart, mEnd) {
         return events;
     }
 
-    // --- CRITICAL RECURRENCE CALCULATION ---
+    // --- CRITICAL RECURRENCE CALCULATION (Modified for stability) ---
     
     const msPerDay = 86400000;
     
     const anchorDate = getScheduleAnchorDate(task);
-    anchorDate.setHours(0, 0, 0, 0); 
-
-    const mStartMidnight = mStart.getTime(); 
-    const anchorMidnight = anchorDate.getTime(); 
+    // Use the stored anchor date's time value (which is UTC 00:00:00 if created with createUTCDate)
+    const anchorTime = anchorDate.getTime();
     
-    // Use Math.round to handle floating point issues caused by time zones/DST
-    const daysSinceAnchor = Math.round((mStartMidnight - anchorMidnight) / msPerDay);
+    // Calculate the difference between calendar start and anchor using clean day count
+    const daysSinceAnchor = Math.round((mStart.getTime() - anchorTime) / msPerDay);
     
     const cyclesElapsed = Math.floor(daysSinceAnchor / frequency);
     
-    let currentDate = new Date(anchorDate);
-    currentDate.setHours(0, 0, 0, 0); 
+    // Start date is anchor time + elapsed cycles
+    let startTime = anchorTime + (cyclesElapsed * frequency * msPerDay);
     
-    currentDate.setDate(currentDate.getDate() + (cyclesElapsed * frequency));
-
     // Advance one more cycle to ensure we start plotting ON or AFTER mStart.
-    currentDate.setDate(currentDate.getDate() + frequency);
-    currentDate.setHours(0, 0, 0, 0); 
+    startTime += (frequency * msPerDay);
+    
+    let currentDate = new Date(startTime);
+    currentDate.setHours(0, 0, 0, 0); // Re-align to local midnight for plotting
+
     // --- END CRITICAL RECURRENCE CALCULATION ---
 
-    // Get the first expected due date (the floor date)
     const targetDueTime = task.targetDueDate ? createLocalDate(task.targetDueDate).getTime() : 0;
 
     while (currentDate.getTime() <= mEnd.getTime()) {
@@ -212,6 +209,7 @@ function getRecurringDueDates(task, mStart, mEnd) {
         const dateString = formatDate(currentDate);
         
         // Only plot if the date is within the calendar view AND is not a historical date before the user's intended start date.
+        // NOTE: targetDueTime is also local midnight due to createLocalDate
         if (currentDate.getTime() >= mStart.getTime() && currentDate.getTime() >= targetDueTime) {
              events[dateString] = { 
                 name: task.taskName + (task.isOneTime ? ' (1-Time)':''), 
@@ -351,10 +349,9 @@ function renderNotepads() {
         if (t.isOneTime && t.frequencyDays === 0) return;
 
         const lastCompDate = t.lastCompleted;
-        const frequency = t.frequencyDays;
         
-        // *** CRITICAL FIX: Use the permanent schedule's expected due date for list checks ***
-        let expectedDue = calculateNextExpectedDueDate(t);
+        // Use the volatile due date calculation for list display (as expected)
+        let expectedDue = calculateDueDate(lastCompDate, t.frequencyDays);
         
         if (!expectedDue) return;
 
@@ -370,7 +367,7 @@ function renderNotepads() {
         const action = isCompletedToday ? `markUndone` : `markDone`;
 
         // ----------------------------------------------------------------------
-        // DAILY TASK LIST LOGIC: ONLY show if DUE TODAY/OVERDUE OR if it was completed TODAY (to keep the checkmark visible).
+        // DAILY TASK LIST LOGIC: Task stays visible and lined through if completed today.
         if (isCurrentlyDueToday || isCompletedToday) { 
             dailyTasksCount++;
             const item = `<li class="${itemClass}"><span class="notepad-checkbox" onclick="${action}(${t.id})">${itemSymbol}</span>${t.taskName}</li>`;
@@ -401,16 +398,15 @@ function renderDashboard() {
     list.innerHTML = '';
     
     taskData.sort((a,b) => {
-        const dueA = calculateNextExpectedDueDate(a);
-        const dueB = calculateNextExpectedDueDate(b);
+        const dueA = calculateDueDate(a.lastCompleted, a.frequencyDays);
+        const dueB = calculateDueDate(b.lastCompleted, b.frequencyDays);
         if (!dueA) return 1;
         if (!dueB) return -1;
         return dueA.getTime() - dueB.getTime();
     });
 
     taskData.forEach((t) => {
-        // *** CRITICAL FIX: Use the permanent schedule's expected due date for list checks ***
-        const due = calculateNextExpectedDueDate(t);
+        const due = calculateDueDate(t.lastCompleted, t.frequencyDays);
         if (t.isOneTime && t.frequencyDays === 0) return;
         
         const status = getStatus(due);
@@ -489,7 +485,7 @@ window.markUndone = (taskId) => {
         const previousCompletion = t.completionHistory[t.completionHistory.length - 1];
         t.lastCompleted = previousCompletion.dateOnly;
     } else {
-        t.lastCompleted = '';
+        t.lastCompleted = t.initialLastCompleted || ''; // Revert to initial anchor if history empty
     }
 
     // 3. Revert one-time status (if applicable and necessary)
@@ -505,8 +501,7 @@ window.skipTask = (taskId) => {
     const t = taskData.find(task => task.id === taskId);
     if (!t) return;
     
-    // Skip Task logic remains based on lastCompleted as it sets the *next* cycle start
-    const due = calculateDueDateFromLastCompleted(t.lastCompleted, t.frequencyDays, false);
+    const due = calculateDueDate(t.lastCompleted, t.frequencyDays);
     t.lastCompleted = formatDate(due);
     renderDashboard();
 };
