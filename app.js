@@ -131,30 +131,42 @@ function getRecurringDueDates(task, mStart, mEnd) {
         return events;
     }
 
-    // 1. Determine the first potential recurring due date *after* the last completion.
-    let currentDate = calculateDueDate(task.lastCompleted, frequency, task.isOneTime);
+    // --- CRITICAL FIX: Ensures permanent display of recurring tasks on the calendar ---
     
-    if (!currentDate) return events;
-    currentDate.setHours(0, 0, 0, 0); 
+    // 1. Calculate the difference in days between the task's last completion and the calendar's start date.
+    const lastDate = createLocalDate(task.lastCompleted);
+    const daysSinceLastComp = Math.floor((mStart.getTime() - lastDate.getTime()) / 86400000);
+
+    // 2. Calculate the number of full cycles that occurred between last completion and mStart.
+    const cyclesElapsed = Math.floor(daysSinceLastComp / frequency);
     
-    // 2. If the first upcoming date is before the start of the calendar view,
-    //    advance the date by skipping cycles until it lands inside or just before the view.
+    // 3. Determine the earliest potential recurrence date that falls within the calendar range.
+    let currentDate = new Date(lastDate);
+    currentDate.setDate(lastDate.getDate() + (cyclesElapsed * frequency));
+
+    // If currentDate is still before mStart, advance it by one cycle.
     if (currentDate.getTime() < mStart.getTime()) {
-        const daysDiff = Math.ceil((mStart.getTime() - currentDate.getTime()) / 86400000);
-        const cyclesToSkip = Math.ceil(daysDiff / frequency);
-        currentDate.setDate(currentDate.getDate() + cyclesToSkip * frequency);
+        currentDate.setDate(currentDate.getDate() + frequency);
     }
     
-    // 3. Now, iterate forward through the calendar range.
+    currentDate.setHours(0, 0, 0, 0); 
+    // --- END CRITICAL FIX ---
+
+
     while (currentDate.getTime() <= mEnd.getTime()) {
         
-        if (currentDate.getTime() >= mStart.getTime()) {
-            const dateString = formatDate(currentDate);
-            events[dateString] = { 
+        const dateString = formatDate(currentDate);
+        
+        // We only add the event if it's NOT the exact date it was completed,
+        // unless it's a non-recurring task (which is usually excluded by the initial checks anyway).
+        // This prevents showing an "overdue" event on the day it was marked done.
+        if (dateString !== task.lastCompleted || task.isOneTime) {
+             events[dateString] = { 
                 name: task.taskName + (task.isOneTime ? ' (1-Time)':''), 
                 overdue: currentDate.getTime() < getToday() 
             };
         }
+        
 
         if (task.isOneTime) break;
         
@@ -385,8 +397,7 @@ window.markDone = (taskId) => {
     t.completionHistory.push({ timestamp: now.toISOString(), dateOnly: todayFormatted });
     t.lastCompleted = todayFormatted;
 
-    // *** FIX: REMOVED the line that set t.frequencyDays = 0 for one-time tasks ***
-    // The initTracker cleanup handles deletion only when the next due date passes.
+    // FIX CONFIRMED: One-time tasks rely on the initTracker cleanup filter, not setting freqDays = 0 here.
     
     renderDashboard();
 };
