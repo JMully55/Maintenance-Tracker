@@ -60,7 +60,12 @@ function initTracker() {
 }
 
 // --- Utility & Date Helpers ---
-const getToday = () => new Date().setHours(0, 0, 0, 0);
+// *** UTC FIX 1: All day comparisons must use the same timezone boundary. ***
+const getToday = () => {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0); // Set to local midnight
+    return d.getTime();
+};
 
 function formatDate(date) {
     const d = new Date(date);
@@ -75,8 +80,10 @@ function formatTimestamp(isoString) {
     return `${date.toLocaleDateString()} ${date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
 }
 
+// *** UTC FIX 2: Ensure all created dates are initialized without time components (local midnight) ***
 function createLocalDate(dateString) {
     const parts = dateString.split('-').map(p => parseInt(p, 10));
+    // YYYY, MM (0-indexed), DD. Creates date at local 00:00:00
     return new Date(parts[0], parts[1] - 1, parts[2]);
 }
 
@@ -93,6 +100,7 @@ function calculateDueDate(lastComp, freqDays, isOneTime) {
 
 function getStatus(dueDate) {
     if (!dueDate) return { text: 'N/A', class: '', sortValue: 1000 };
+    // Get difference between midnight due date and midnight today
     const diff = Math.ceil((dueDate.setHours(0,0,0,0) - getToday()) / 86400000);
     if (diff < 0) return { text: `OVERDUE (${Math.abs(diff)}d)`, class: 'status-overdue', sortValue: diff };
     if (diff <= 30) return { text: `DUE IN ${diff}d`, class: 'status-due', sortValue: diff };
@@ -102,25 +110,20 @@ function getStatus(dueDate) {
 // *** NEW/UPDATED UTILITY: Anchor for Stable Calendar Recurrence ***
 function getScheduleAnchorDate(task) {
     if (task.completionHistory && task.completionHistory.length > 0) {
-        // Find the oldest completion date in the history (the true schedule start)
         const firstCompletion = task.completionHistory[0].dateOnly;
-        // Calculate the theoretical date BEFORE the first completion
         const firstDate = createLocalDate(firstCompletion);
         firstDate.setDate(firstDate.getDate() - task.frequencyDays);
         return firstDate;
     }
     
-    // --- FIX: Use the original input date as a non-shifting anchor if history is empty ---
     if (task.lastCompleted) {
         return createLocalDate(task.lastCompleted);
     }
     
-    // True fallback if task is brand new and lastCompleted was never set or cleared
     const now = new Date();
     const fallbackAnchor = new Date(now.getFullYear(), 0, 1); 
     fallbackAnchor.setDate(fallbackAnchor.getDate() - task.frequencyDays);
     return fallbackAnchor;
-    // --- END FIX ---
 }
 
 // --- Calendar Logic (Permanent Schedule - FINAL FIX) ---
@@ -155,18 +158,17 @@ function getRecurringDueDates(task, mStart, mEnd) {
 
     // --- CRITICAL FIX FOR STABLE PERMANENT CALENDAR DISPLAY ---
     
-    // 1. Get the stable historical anchor date for the schedule.
-    const anchorDate = getScheduleAnchorDate(task);
-    
-    // *** FINAL FIX for 1-Day Shift: Calculate difference using pure milliseconds. ***
     const msPerDay = 86400000;
     
+    // 1. Get the stable historical anchor date for the schedule.
+    const anchorDate = getScheduleAnchorDate(task);
+    anchorDate.setHours(0, 0, 0, 0); // Ensure anchor is local midnight
+
     // 2. Calculate the difference in days between the anchor date and the calendar's start date (mStart).
-    // Ensure both dates are exactly at local midnight to prevent time zone/DST issues from shifting the day count.
     const mStartMidnight = mStart.getTime(); 
-    const anchorMidnight = anchorDate.setHours(0, 0, 0, 0); 
+    const anchorMidnight = anchorDate.getTime(); 
     
-    // Use Math.round to handle potential floating point errors from DST/timezone shifts, ensuring a clean day count.
+    // *** CRITICAL FIX FOR DAY SHIFT: Use Math.round for robust day counting ***
     const daysSinceAnchor = Math.round((mStartMidnight - anchorMidnight) / msPerDay);
     
     // 3. Calculate the number of full cycles elapsed to get from anchorDate to a point *just before* mStart.
