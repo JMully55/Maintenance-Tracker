@@ -49,7 +49,6 @@ function initTracker() {
         return true; // Keep recurring tasks, and one-time tasks not yet completed/passed
     });
     saveTasks(); // Save the filtered list immediately
-    // *** END FIX ***
     
     // CRITICAL: Ensure setup runs before renderDashboard
     setupCalendarControls();
@@ -100,7 +99,7 @@ function getStatus(dueDate) {
     return { text: 'Upcoming', class: '', sortValue: diff };
 }
 
-// *** NEW UTILITY: Anchor for Stable Calendar Recurrence ***
+// *** NEW/UPDATED UTILITY: Anchor for Stable Calendar Recurrence ***
 function getScheduleAnchorDate(task) {
     if (task.completionHistory && task.completionHistory.length > 0) {
         // Find the oldest completion date in the history (the true schedule start)
@@ -111,6 +110,7 @@ function getScheduleAnchorDate(task) {
         return firstDate;
     }
     // If no history, assume the schedule starts from the task's lastCompleted date (or next target date).
+    // Note: If lastCompleted is empty, this creates a Date object for today.
     return createLocalDate(task.lastCompleted) || new Date();
 }
 
