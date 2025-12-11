@@ -11,7 +11,7 @@ function loadTasks() {
             if (typeof t.isOneTime === 'undefined') t.isOneTime = false;
             if (typeof t.initialLastCompleted === 'undefined') t.initialLastCompleted = t.lastCompleted;
             if (typeof t.targetDueDate === 'undefined') {
-                t.targetDueDate = calculateDueDate(t.lastCompleted, t.frequencyDays, t.isOneTime);
+                t.targetDueDate = calculateDueDateFromLastCompleted(t.lastCompleted, t.frequencyDays, t.isOneTime);
                 if (t.targetDueDate) t.targetDueDate = formatDate(t.targetDueDate);
             }
         });
@@ -40,7 +40,8 @@ function initTracker() {
     taskData = taskData.filter(t => {
         if (t.isOneTime) {
             if (t.completionHistory && t.completionHistory.length > 0) {
-                const nextDue = calculateDueDate(t.lastCompleted, t.frequencyDays, t.isOneTime);
+                // Use the stable calculation here
+                const nextDue = calculateNextExpectedDueDate(t);
                 if (nextDue && nextDue.getTime() < today) {
                     return false; 
                 }
@@ -83,7 +84,8 @@ function createLocalDate(dateString) {
     return new Date(parts[0], parts[1] - 1, parts[2]);
 }
 
-function calculateDueDate(lastComp, freqDays, isOneTime) {
+// --- Old calculation function, kept only for initialization/legacy conversion if needed ---
+function calculateDueDateFromLastCompleted(lastComp, freqDays) {
     if (!lastComp) return null;
     const lastDate = createLocalDate(lastComp);
     const nextDate = new Date(lastDate);
@@ -93,6 +95,27 @@ function calculateDueDate(lastComp, freqDays, isOneTime) {
     nextDate.setDate(lastDate.getDate() + frequency);
     return nextDate;
 }
+
+// *** NEW CORE LOGIC: Calculate Next Due Date from Permanent Anchor ***
+window.calculateNextExpectedDueDate = function(task) {
+    const frequency = parseInt(task.frequencyDays);
+    if (isNaN(frequency) || frequency <= 0) return null;
+    
+    // 1. Get the latest completion date
+    let lastCompletion = task.lastCompleted;
+    if (!lastCompletion) {
+         // If never completed, use the initial anchor date + one cycle to get the first due date.
+         const initialAnchor = getScheduleAnchorDate(task);
+         initialAnchor.setDate(initialAnchor.getDate() + frequency);
+         return initialAnchor;
+    }
+    
+    // 2. Calculate next date normally based on the last recorded completion.
+    return calculateDueDateFromLastCompleted(lastCompletion, frequency);
+}
+// Renaming the global reference used by the Dashboard
+window.calculateDueDate = window.calculateNextExpectedDueDate;
+
 
 function getStatus(dueDate) {
     if (!dueDate) return { text: 'N/A', class: '', sortValue: 1000 };
@@ -105,19 +128,16 @@ function getStatus(dueDate) {
 // *** CRITICAL FIX FOR CALENDAR STABILITY: Use a permanent anchor date. ***
 function getScheduleAnchorDate(task) {
     if (task.completionHistory && task.completionHistory.length > 0) {
-        // Anchor to the date one cycle BEFORE the oldest actual recorded completion.
         const firstCompletion = task.completionHistory[0].dateOnly;
         const firstDate = createLocalDate(firstCompletion);
         firstDate.setDate(firstDate.getDate() - task.frequencyDays);
         return firstDate;
     }
     
-    // 1. If history is empty, anchor to the original date input during task creation (which is initialLastCompleted).
     if (task.initialLastCompleted) {
         return createLocalDate(task.initialLastCompleted);
     }
     
-    // 2. Default fallback if task is missing all date context.
     if (task.lastCompleted) {
         return createLocalDate(task.lastCompleted);
     }
@@ -149,7 +169,8 @@ function getRecurringDueDates(task, mStart, mEnd) {
     const frequency = parseInt(task.frequencyDays);
     if (isNaN(frequency) || frequency <= 0) {
         if(task.isOneTime && frequency === 1 && task.lastCompleted) {
-            const nextDueDate = calculateDueDate(task.lastCompleted, 1, true);
+            // Use the anchor-based calculation for one-time events as well for consistency
+            const nextDueDate = calculateNextExpectedDueDate(task);
             if (nextDueDate && nextDueDate >= mStart && nextDueDate <= mEnd) {
                  events[formatDate(nextDueDate)] = { name: `${task.taskName} (1-Time)`, overdue: nextDueDate.getTime() < getToday() };
             }
@@ -255,7 +276,7 @@ window.renderCalendar = function() {
     }
 };
 
-// --- Modal Functions ---
+// --- Modal Functions (omitted for brevity, no changes here) ---
 window.openHistoryModal = () => { 
     const modal = document.getElementById('history-modal');
     if (modal) { modal.style.display = 'block'; renderHistoryModal(); }
@@ -308,7 +329,6 @@ function renderCompletedModal() {
         list.innerHTML += `<tr><td>${formatTimestamp(h.time)}</td><td>${h.name}</td><td>${h.cat}</td></tr>`;
     });
 }
-
 // --- Dashboard Rendering ---
 function renderNotepads() {
     const dl = document.getElementById('daily-tasks-list'), wl = document.getElementById('weekly-tasks-list');
@@ -333,13 +353,9 @@ function renderNotepads() {
         const lastCompDate = t.lastCompleted;
         const frequency = t.frequencyDays;
         
-        let expectedDue = null;
-        if (lastCompDate) {
-            expectedDue = calculateDueDate(lastCompDate, frequency, t.isOneTime);
-        } else {
-            expectedDue = now; 
-        }
-
+        // *** CRITICAL FIX: Use the permanent schedule's expected due date for list checks ***
+        let expectedDue = calculateNextExpectedDueDate(t);
+        
         if (!expectedDue) return;
 
         const expectedDueS = formatDate(expectedDue);
@@ -354,7 +370,7 @@ function renderNotepads() {
         const action = isCompletedToday ? `markUndone` : `markDone`;
 
         // ----------------------------------------------------------------------
-        // DAILY TASK LIST LOGIC: Keep task visible IF it's due today/overdue OR if it was just completed today.
+        // DAILY TASK LIST LOGIC: ONLY show if DUE TODAY/OVERDUE OR if it was completed TODAY (to keep the checkmark visible).
         if (isCurrentlyDueToday || isCompletedToday) { 
             dailyTasksCount++;
             const item = `<li class="${itemClass}"><span class="notepad-checkbox" onclick="${action}(${t.id})">${itemSymbol}</span>${t.taskName}</li>`;
@@ -385,15 +401,16 @@ function renderDashboard() {
     list.innerHTML = '';
     
     taskData.sort((a,b) => {
-        const dueA = calculateDueDate(a.lastCompleted, a.frequencyDays, a.isOneTime);
-        const dueB = calculateDueDate(b.lastCompleted, b.frequencyDays, b.isOneTime);
+        const dueA = calculateNextExpectedDueDate(a);
+        const dueB = calculateNextExpectedDueDate(b);
         if (!dueA) return 1;
         if (!dueB) return -1;
         return dueA.getTime() - dueB.getTime();
     });
 
     taskData.forEach((t) => {
-        const due = calculateDueDate(t.lastCompleted, t.frequencyDays, t.isOneTime);
+        // *** CRITICAL FIX: Use the permanent schedule's expected due date for list checks ***
+        const due = calculateNextExpectedDueDate(t);
         if (t.isOneTime && t.frequencyDays === 0) return;
         
         const status = getStatus(due);
@@ -488,7 +505,8 @@ window.skipTask = (taskId) => {
     const t = taskData.find(task => task.id === taskId);
     if (!t) return;
     
-    const due = calculateDueDate(t.lastCompleted, t.frequencyDays, false);
+    // Skip Task logic remains based on lastCompleted as it sets the *next* cycle start
+    const due = calculateDueDateFromLastCompleted(t.lastCompleted, t.frequencyDays, false);
     t.lastCompleted = formatDate(due);
     renderDashboard();
 };
@@ -531,7 +549,7 @@ window.toggleFormVisibility = function() {
 }
 
 
-// --- Form Handling (FIXED to manually clear fields and preserve anchor) ---
+// --- Form Handling (FINAL FIXES) ---
 function registerFormListener() {
     document.getElementById('task-form').onsubmit = (e) => {
         e.preventDefault();
@@ -539,8 +557,6 @@ function registerFormListener() {
         const oneTime = fv === 'single';
         let freq = oneTime ? 1 : (fv === 'custom' ? parseInt(document.getElementById('customDays').value) : parseInt(fv));
         const inputDate = document.getElementById('dateInput').value; 
-
-        let lastCompletedDate = '';
 
         if (isNaN(freq) || freq <= 0) {
             alert("Please enter a valid positive number for Frequency or select a standard interval.");
@@ -553,10 +569,10 @@ function registerFormListener() {
 
         const targetDate = createLocalDate(inputDate);
         
-        // Calculate initialLastCompleted (the date one cycle before the target date)
+        // Calculate initialLastCompleted (the anchor date one cycle before the target date)
         const initialLastCompleted = new Date(targetDate);
         initialLastCompleted.setDate(targetDate.getDate() - freq);
-        lastCompletedDate = formatDate(initialLastCompleted);
+        const lastCompletedDate = formatDate(initialLastCompleted);
         
         // Calculate the target due date (the date the user entered)
         const targetDueS = formatDate(targetDate);
@@ -569,23 +585,21 @@ function registerFormListener() {
             category: document.getElementById('category').value,
             description: document.getElementById('description').value,
             frequencyDays: freq, 
-            lastCompleted: lastCompletedDate, 
-            initialLastCompleted: lastCompletedDate, // Permanent anchor
-            targetDueDate: targetDueS, // New property for calendar floor
+            lastCompleted: lastCompletedDate, // Set to anchor date to ensure first due date is correct
+            initialLastCompleted: lastCompletedDate, 
+            targetDueDate: targetDueS, 
             isOneTime: oneTime, 
             completionHistory: initialHistory 
         });
         renderDashboard(); 
         
-        // *** FIX: Manually clear critical input fields for reliability ***
+        // --- Cleanup ---
         document.getElementById('taskName').value = '';
         document.getElementById('category').value = ''; 
         document.getElementById('description').value = '';
         document.getElementById('dateInput').value = '';
         document.getElementById('customDays').value = ''; 
-        document.getElementById('frequencySelect').value = '7'; // Set frequency back to default (Weekly)
-        toggleCustomFrequency(); // Hide custom input if it was visible
-        // *** END FIX ***
-        
+        document.getElementById('frequencySelect').value = '7';
+        toggleCustomFrequency();
     };
 }
