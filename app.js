@@ -158,15 +158,22 @@ function getRecurringDueDates(task, mStart, mEnd) {
     // 1. Get the stable historical anchor date for the schedule.
     const anchorDate = getScheduleAnchorDate(task);
     
+    // *** FINAL FIX for 1-Day Shift: Calculate difference using pure milliseconds. ***
+    const msPerDay = 86400000;
+    
     // 2. Calculate the difference in days between the anchor date and the calendar's start date (mStart).
-    const daysSinceAnchor = Math.floor((mStart.getTime() - anchorDate.getTime()) / 86400000);
-
+    // Ensure both dates are exactly at local midnight to prevent time zone/DST issues from shifting the day count.
+    const mStartMidnight = mStart.getTime(); 
+    const anchorMidnight = anchorDate.setHours(0, 0, 0, 0); 
+    
+    // Use Math.round to handle potential floating point errors from DST/timezone shifts, ensuring a clean day count.
+    const daysSinceAnchor = Math.round((mStartMidnight - anchorMidnight) / msPerDay);
+    
     // 3. Calculate the number of full cycles elapsed to get from anchorDate to a point *just before* mStart.
     const cyclesElapsed = Math.floor(daysSinceAnchor / frequency);
     
     // 4. Set currentDate to the first recurrence date that occurred *just before* mStart.
     let currentDate = new Date(anchorDate);
-    // *** FIX FOR 1-DAY SHIFT: Enforce local midnight on the anchor before arithmetic. ***
     currentDate.setHours(0, 0, 0, 0); 
     
     currentDate.setDate(currentDate.getDate() + (cyclesElapsed * frequency));
