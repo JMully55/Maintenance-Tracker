@@ -109,9 +109,17 @@ function getScheduleAnchorDate(task) {
         firstDate.setDate(firstDate.getDate() - task.frequencyDays);
         return firstDate;
     }
-    // If no history, assume the schedule starts from the task's lastCompleted date (or next target date).
-    // Note: If lastCompleted is empty, this creates a Date object for today.
-    return createLocalDate(task.lastCompleted) || new Date();
+    
+    // --- FIX START: Use a non-shifting historical anchor if history is empty ---
+    // This prevents the calendar schedule from jumping to 'today' when a task is marked undone
+    // and its history is cleared, which would make the recurrence pattern disappear.
+    const now = new Date();
+    // Anchor to Jan 1st of the current year
+    const fallbackAnchor = new Date(now.getFullYear(), 0, 1); 
+    // Push this anchor back by one cycle so the first recurrence hits on or after Jan 1st
+    fallbackAnchor.setDate(fallbackAnchor.getDate() - task.frequencyDays);
+    return fallbackAnchor;
+    // --- FIX END ---
 }
 
 // --- Calendar Logic (Permanent Schedule - FINAL FIX) ---
