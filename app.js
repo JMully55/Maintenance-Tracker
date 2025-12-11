@@ -131,27 +131,34 @@ function getRecurringDueDates(task, mStart, mEnd) {
         return events;
     }
 
-    // 1. Start tracking from the next expected due date based on the last completion.
-    let currentDate = calculateDueDate(task.lastCompleted, frequency, task.isOneTime);
+    // --- CRITICAL FIX FOR PERMANENT CALENDAR DISPLAY ---
+    // 1. Determine the date the task would have first occurred if it started on its first known completion date.
+    const lastDate = createLocalDate(task.lastCompleted);
+
+    // 2. Calculate the difference in days between the last completion and the calendar's start date (mStart).
+    const daysSinceLastComp = Math.floor((mStart.getTime() - lastDate.getTime()) / 86400000);
+
+    // 3. Calculate the number of full cycles elapsed to get from lastDate to a point *just before* mStart.
+    const cyclesElapsed = Math.floor(daysSinceLastComp / frequency);
     
-    if (!currentDate) return events;
+    // 4. Set currentDate to the first recurrence date that occurred *just before* mStart.
+    let currentDate = new Date(lastDate);
+    currentDate.setDate(lastDate.getDate() + (cyclesElapsed * frequency));
+
+    // 5. Advance one more cycle to ensure we start plotting ON or AFTER mStart.
+    currentDate.setDate(currentDate.getDate() + frequency);
     currentDate.setHours(0, 0, 0, 0); 
-    
-    // 2. If the next upcoming date is before the start of the calendar view,
-    //    advance the date by skipping cycles until it lands inside or just before the view.
-    //    This is the standard approach to prevent plotting past dates outside the view.
-    if (currentDate.getTime() < mStart.getTime()) {
-        const daysDiff = Math.ceil((mStart.getTime() - currentDate.getTime()) / 86400000);
-        const cyclesToSkip = Math.ceil(daysDiff / frequency);
-        currentDate.setDate(currentDate.getDate() + cyclesToSkip * frequency);
-    }
-    
-    // 3. Now, iterate forward through the calendar range.
+    // --- END CRITICAL FIX ---
+
+
     while (currentDate.getTime() <= mEnd.getTime()) {
         
+        const dateString = formatDate(currentDate);
+        
+        // This ensures the calendar shows all recurring instances regardless of completion,
+        // but labels them 'overdue' if the date has passed.
         if (currentDate.getTime() >= mStart.getTime()) {
-            const dateString = formatDate(currentDate);
-            events[dateString] = { 
+             events[dateString] = { 
                 name: task.taskName + (task.isOneTime ? ' (1-Time)':''), 
                 overdue: currentDate.getTime() < getToday() 
             };
