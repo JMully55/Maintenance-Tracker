@@ -113,20 +113,16 @@ function getStatus(dueDate) {
     return { text: 'Upcoming', class: '', sortValue: diff };
 }
 
-// *** CRITICAL FIX: Base anchor date purely on the original target due date. ***
+// NOTE: getScheduleAnchorDate is now largely irrelevant for the calendar display stability,
+// but it is kept to maintain the internal task data structure consistency for recurrence.
 function getScheduleAnchorDate(task) {
     const frequency = task.frequencyDays;
     
-    // Fallback if targetDueDate is missing (shouldn't happen with new tasks)
     if (!task.targetDueDate) {
          if (task.initialLastCompleted) return createUTCDate(task.initialLastCompleted);
          return createUTCDate(formatDate(new Date()));
     }
     
-    // The true anchor is the original target day, enforced with UTC for stability.
-    const targetDate = createUTCDate(task.targetDueDate);
-    
-    // If history exists, the stable starting point is one cycle BEFORE the *oldest* completion.
     if (task.completionHistory && task.completionHistory.length > 0) {
         const firstCompletion = task.completionHistory[0].dateOnly;
         const firstDate = createUTCDate(firstCompletion);
@@ -134,7 +130,7 @@ function getScheduleAnchorDate(task) {
         return firstDate;
     }
     
-    // If history is empty, use the date one cycle before the original target date.
+    const targetDate = createUTCDate(task.targetDueDate);
     targetDate.setUTCDate(targetDate.getUTCDate() - frequency);
     return targetDate;
 }
@@ -169,48 +165,40 @@ function getRecurringDueDates(task, mStart, mEnd) {
         return events;
     }
 
-    // --- CRITICAL RECURRENCE CALCULATION FIX ---
+    // --- FINAL FIX: FORCE RECURRENCE BASED ON TARGET DAY OF WEEK (DOW) ---
     
-    // 1. Get the stable starting point for the recurrence pattern.
-    const anchorDate = getScheduleAnchorDate(task);
+    const msPerDay = 86400000;
     
-    // 2. Determine the day of the week that the task is supposed to fall on (0=Sun, 6=Sat).
-    // Use the local day because mStart/mEnd are local dates.
-    const anchorDayOfWeek = anchorDate.getDay(); 
+    // 1. Determine the target DOW from the immutable targetDueDate
+    if (!task.targetDueDate) return events;
+    const targetDueDate = createLocalDate(task.targetDueDate);
+    const targetDueTime = targetDueDate.getTime();
+    const targetDOW = targetDueDate.getDay(); // 0 (Sun) to 6 (Sat)
     
-    // 3. Set the initial plotting date (currentDate) to the first day in the calendar view
-    // that matches the anchorDayOfWeek AND falls on or after the mStart date.
-    
+    // 2. Find the first day in the calendar view (mStart) that matches the target DOW.
     let currentDate = new Date(mStart);
     currentDate.setHours(0, 0, 0, 0);
     
-    const startDayOfWeek = currentDate.getDay(); // Day of the week of mStart
-    const dayDiff = (anchorDayOfWeek - startDayOfWeek + 7) % 7;
+    const startDayOfWeek = currentDate.getDay(); 
+    const dayDiff = (targetDOW - startDayOfWeek + 7) % 7;
     currentDate.setDate(currentDate.getDate() + dayDiff);
-    currentDate.setHours(0, 0, 0, 0); // Re-align after setDate
+    currentDate.setHours(0, 0, 0, 0); 
     
-    // If the calculated start date is still before the anchor (this happens if freq > 7),
-    // we need to step forward by cycles until we pass the anchor date.
-    const msPerDay = 86400000;
-    const anchorTime = anchorDate.getTime();
-    
-    while (currentDate.getTime() < anchorTime) {
+    // 3. If the starting date is before the target date, advance to the first valid scheduled date.
+    // This solves both the "Initial Day Missing" problem and the calendar shift.
+    while (currentDate.getTime() < targetDueTime) {
         currentDate.setDate(currentDate.getDate() + frequency);
         currentDate.setHours(0, 0, 0, 0);
     }
-    
-    // Since the recurrence logic is now based on day-of-week/frequency combination, 
-    // we just need to enforce the targetDueDate as the absolute starting floor.
-    const targetDueTime = task.targetDueDate ? createLocalDate(task.targetDueDate).getTime() : 0;
-    
-    // --- END CRITICAL RECURRENCE CALCULATION FIX ---
+
+    // --- END FINAL FIX ---
 
     while (currentDate.getTime() <= mEnd.getTime()) {
         
         const dateString = formatDate(currentDate);
         
-        // Only plot if the date is within the calendar view AND is on or after the user's initial Target Day.
-        if (currentDate.getTime() >= mStart.getTime() && currentDate.getTime() >= targetDueTime) {
+        // Only plot if the date is within the current month view
+        if (currentDate.getTime() >= mStart.getTime()) {
              events[dateString] = { 
                 name: task.taskName + (task.isOneTime ? ' (1-Time)':''), 
                 overdue: currentDate.getTime() < getToday() 
