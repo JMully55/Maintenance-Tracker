@@ -100,7 +100,7 @@ function getStatus(dueDate) {
     return { text: 'Upcoming', class: '', sortValue: diff };
 }
 
-// --- Calendar Logic (Standard Tracking - FIXED) ---
+// --- Calendar Logic (Permanent Schedule - FINAL FIX) ---
 function setupCalendarControls() {
     const ms = document.getElementById('month-select'), ys = document.getElementById('year-select');
     if (!ms || !ys) return; 
@@ -132,7 +132,10 @@ function getRecurringDueDates(task, mStart, mEnd) {
     }
 
     // --- CRITICAL FIX FOR PERMANENT CALENDAR DISPLAY ---
-    // 1. Determine the date the task would have first occurred if it started on its first known completion date.
+    // This logic ensures the calendar shows ALL recurrence points, 
+    // regardless of when the task was last completed.
+    
+    // 1. Determine the task's starting reference point.
     const lastDate = createLocalDate(task.lastCompleted);
 
     // 2. Calculate the difference in days between the last completion and the calendar's start date (mStart).
@@ -155,8 +158,7 @@ function getRecurringDueDates(task, mStart, mEnd) {
         
         const dateString = formatDate(currentDate);
         
-        // This ensures the calendar shows all recurring instances regardless of completion,
-        // but labels them 'overdue' if the date has passed.
+        // This plot logic always runs if we are in the calendar's viewable range
         if (currentDate.getTime() >= mStart.getTime()) {
              events[dateString] = { 
                 name: task.taskName + (task.isOneTime ? ' (1-Time)':''), 
