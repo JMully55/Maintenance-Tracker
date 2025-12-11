@@ -115,7 +115,7 @@ form button[type="submit"] {
     box-shadow: 0 2px 5px rgba(0,0,0,0.2);
 }
 
-/* Focus Notepads Layout Adjustments */
+/* Focus Notepads Layout Adjustments (Top Row) */
 #focus-notepads-row1 {
     display: flex;
     justify-content: space-around;
@@ -140,6 +140,7 @@ form button[type="submit"] {
 .notepad h3 { margin-top: 0; border-bottom: 1px solid rgba(0,0,0,0.1); }
 .notepad ul { list-style: none; padding: 0; }
 .notepad li { 
+    /* Base list styling */
     padding: 5px 0; 
     display: flex; 
     align-items: center; 
@@ -153,6 +154,70 @@ form button[type="submit"] {
     text-decoration: line-through 3px #a94442 !important; /* Force strike-through */
     color: #777 !important; /* Force grey color */
 }
+
+
+/* --- NEW ACTION BOARD STYLES --- */
+#focus-notepads-row2 {
+    /* Ensure this row takes up full width and centers the content */
+    display: flex; 
+    justify-content: center;
+    margin-top: 20px;
+    margin-bottom: 30px; 
+}
+
+.upcoming-focus { 
+    /* Make this notepad full width and give it a unique color/rotation */
+    flex: 0 0 95%; /* Make it nearly full width */
+    max-width: 95%; 
+    min-height: 100px;
+    background-color: #ffb3b3; /* Light Red/Pink color */
+    transform: rotate(0.5deg); /* Slight rotation */
+}
+
+/* Ensure the list items inside the new notepad are readable and spaced */
+.upcoming-focus li {
+    display: flex;
+    justify-content: space-between; /* Space out the task name and actions */
+    align-items: center;
+    padding: 8px 0;
+    border-bottom: 1px dotted rgba(0,0,0,0.2);
+}
+
+.notepad-actions {
+    /* Container for the action buttons/icons */
+    display: flex;
+    gap: 8px; 
+    align-items: center;
+    font-size: 0.9em;
+    flex-shrink: 0; /* Prevents actions from being compressed */
+}
+
+/* Style the action buttons inside the notepad */
+.notepad-actions button {
+    padding: 3px 6px;
+    font-size: 0.8em;
+    cursor: pointer;
+    border-radius: 4px;
+    font-weight: bold;
+    border: 1px solid rgba(0,0,0,0.2);
+}
+
+.notepad-actions .done-btn {
+    background-color: #5cb85c; /* Green */
+    color: white;
+}
+
+.notepad-actions .skip-btn {
+    background-color: #f0ad4e; /* Orange */
+    color: white;
+}
+
+.notepad-actions .delete-btn {
+    background-color: #d9534f; /* Red */
+    color: white;
+}
+
+/* --- END NEW ACTION BOARD STYLES --- */
 
 
 /* Control Button Positioning (Side-by-side) */
@@ -213,7 +278,7 @@ form button[type="submit"] {
 }
 
 
-/* Table Styling */
+/* Table Styling (Kept for history/completed modals) */
 table {
     box-shadow: 0 2px 5px rgba(0,0,0,0.1);
     background-color: #fafafa;
