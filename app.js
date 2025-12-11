@@ -111,8 +111,6 @@ function getScheduleAnchorDate(task) {
     }
     
     // --- FIX: Use the original input date as a non-shifting anchor if history is empty ---
-    // Since the original input date is calculated to be 'one cycle before the first expected due date',
-    // we use that value (stored in lastCompleted) if it exists. Otherwise, fall back to current year.
     if (task.lastCompleted) {
         return createLocalDate(task.lastCompleted);
     }
@@ -143,13 +141,8 @@ function getRecurringDueDates(task, mStart, mEnd) {
     const events = {};
     if (task.isOneTime && task.frequencyDays === 0) return events;
     
-    // *** CRITICAL FIX: Removed the short-circuit check: if (!task.lastCompleted) return events;
-    // This allows the calendar to use the stable anchor calculation (below) even if 
-    // lastCompleted is temporarily cleared by markUndone.
-    
     const frequency = parseInt(task.frequencyDays);
     if (isNaN(frequency) || frequency <= 0) {
-        // Handle single event logic specifically if it exists, otherwise return
         if(task.isOneTime && frequency === 1 && task.lastCompleted) {
             const nextDueDate = calculateDueDate(task.lastCompleted, 1, true);
             if (nextDueDate && nextDueDate >= mStart && nextDueDate <= mEnd) {
@@ -173,7 +166,10 @@ function getRecurringDueDates(task, mStart, mEnd) {
     
     // 4. Set currentDate to the first recurrence date that occurred *just before* mStart.
     let currentDate = new Date(anchorDate);
-    currentDate.setDate(anchorDate.getDate() + (cyclesElapsed * frequency));
+    // *** FIX FOR 1-DAY SHIFT: Enforce local midnight on the anchor before arithmetic. ***
+    currentDate.setHours(0, 0, 0, 0); 
+    
+    currentDate.setDate(currentDate.getDate() + (cyclesElapsed * frequency));
 
     // 5. Advance one more cycle to ensure we start plotting ON or AFTER mStart.
     currentDate.setDate(currentDate.getDate() + frequency);
