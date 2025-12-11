@@ -31,13 +31,13 @@ function initTracker() {
         }
     });
     
-    // *** FIX: Remove completed one-time tasks whose due date has passed ***
+    // *** FIX: Remove completed one-time tasks whose due date has passed (Midnight Cleanup) ***
     const today = getToday();
     taskData = taskData.filter(t => {
         if (t.isOneTime) {
             // Check if it has been completed at least once
             if (t.completionHistory && t.completionHistory.length > 0) {
-                // Calculate the task's single expected due date
+                // Calculate the task's single expected due date (which is one cycle after last completed)
                 const nextDue = calculateDueDate(t.lastCompleted, t.frequencyDays, t.isOneTime);
                 
                 // If the next due date has passed (it's officially over)
@@ -100,7 +100,7 @@ function getStatus(dueDate) {
     return { text: 'Upcoming', class: '', sortValue: diff };
 }
 
-// --- Calendar Logic (MAXIMUM GUARDING) ---
+// --- Calendar Logic (Standard Tracking - FIXED) ---
 function setupCalendarControls() {
     const ms = document.getElementById('month-select'), ys = document.getElementById('year-select');
     if (!ms || !ys) return; 
@@ -131,42 +131,31 @@ function getRecurringDueDates(task, mStart, mEnd) {
         return events;
     }
 
-    // --- CRITICAL FIX: Ensures permanent display of recurring tasks on the calendar ---
+    // 1. Start tracking from the next expected due date based on the last completion.
+    let currentDate = calculateDueDate(task.lastCompleted, frequency, task.isOneTime);
     
-    // 1. Calculate the difference in days between the task's last completion and the calendar's start date.
-    const lastDate = createLocalDate(task.lastCompleted);
-    const daysSinceLastComp = Math.floor((mStart.getTime() - lastDate.getTime()) / 86400000);
-
-    // 2. Calculate the number of full cycles that occurred between last completion and mStart.
-    const cyclesElapsed = Math.floor(daysSinceLastComp / frequency);
+    if (!currentDate) return events;
+    currentDate.setHours(0, 0, 0, 0); 
     
-    // 3. Determine the earliest potential recurrence date that falls within the calendar range.
-    let currentDate = new Date(lastDate);
-    currentDate.setDate(lastDate.getDate() + (cyclesElapsed * frequency));
-
-    // If currentDate is still before mStart, advance it by one cycle.
+    // 2. If the next upcoming date is before the start of the calendar view,
+    //    advance the date by skipping cycles until it lands inside or just before the view.
+    //    This is the standard approach to prevent plotting past dates outside the view.
     if (currentDate.getTime() < mStart.getTime()) {
-        currentDate.setDate(currentDate.getDate() + frequency);
+        const daysDiff = Math.ceil((mStart.getTime() - currentDate.getTime()) / 86400000);
+        const cyclesToSkip = Math.ceil(daysDiff / frequency);
+        currentDate.setDate(currentDate.getDate() + cyclesToSkip * frequency);
     }
     
-    currentDate.setHours(0, 0, 0, 0); 
-    // --- END CRITICAL FIX ---
-
-
+    // 3. Now, iterate forward through the calendar range.
     while (currentDate.getTime() <= mEnd.getTime()) {
         
-        const dateString = formatDate(currentDate);
-        
-        // We only add the event if it's NOT the exact date it was completed,
-        // unless it's a non-recurring task (which is usually excluded by the initial checks anyway).
-        // This prevents showing an "overdue" event on the day it was marked done.
-        if (dateString !== task.lastCompleted || task.isOneTime) {
-             events[dateString] = { 
+        if (currentDate.getTime() >= mStart.getTime()) {
+            const dateString = formatDate(currentDate);
+            events[dateString] = { 
                 name: task.taskName + (task.isOneTime ? ' (1-Time)':''), 
                 overdue: currentDate.getTime() < getToday() 
             };
         }
-        
 
         if (task.isOneTime) break;
         
@@ -332,8 +321,7 @@ function renderNotepads() {
         const action = isCompletedToday ? `markUndone` : `markDone`;
 
         // ----------------------------------------------------------------------
-        // DAILY TASK LIST LOGIC
-        // Must appear if (A) it's due today/overdue OR (B) it was marked complete today
+        // DAILY TASK LIST LOGIC (Stays visible if due today or completed today)
         if (isCurrentlyDueToday || isCompletedToday) { 
             dailyTasksCount++;
             const item = `<li class="${itemClass}"><span class="notepad-checkbox" onclick="${action}(${t.id})">${itemSymbol}</span>${t.taskName}</li>`;
@@ -342,7 +330,6 @@ function renderNotepads() {
 
         // ----------------------------------------------------------------------
         // WEEKLY TASK LIST LOGIC
-        // Must appear if (A) it's due this week OR (B) it was marked complete today
         if (isDueThisWeek || isCompletedToday) {
              weeklyTasksCount++;
              // Use expected due date unless it was completed today (then use today's date for display consistency)
@@ -397,8 +384,6 @@ window.markDone = (taskId) => {
     t.completionHistory.push({ timestamp: now.toISOString(), dateOnly: todayFormatted });
     t.lastCompleted = todayFormatted;
 
-    // FIX CONFIRMED: One-time tasks rely on the initTracker cleanup filter, not setting freqDays = 0 here.
-    
     renderDashboard();
 };
 
