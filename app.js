@@ -9,8 +9,12 @@ function loadTasks() {
         taskData.forEach(t => {
             if (!t.completionHistory) t.completionHistory = [];
             if (typeof t.isOneTime === 'undefined') t.isOneTime = false;
-            // Ensure new tasks have a fallback property
             if (typeof t.initialLastCompleted === 'undefined') t.initialLastCompleted = t.lastCompleted;
+            // Ensure task has the target due date for the calendar floor
+            if (typeof t.targetDueDate === 'undefined') {
+                t.targetDueDate = calculateDueDate(t.lastCompleted, t.frequencyDays, t.isOneTime);
+                if (t.targetDueDate) t.targetDueDate = formatDate(t.targetDueDate);
+            }
         });
     }
 }
@@ -33,7 +37,6 @@ function initTracker() {
         }
     });
     
-    // *** FIX: Remove completed one-time tasks whose due date has passed (Midnight Cleanup) ***
     const today = getToday();
     taskData = taskData.filter(t => {
         if (t.isOneTime) {
@@ -110,9 +113,7 @@ function getScheduleAnchorDate(task) {
         return firstDate;
     }
     
-    // --- FINAL FALLBACK LOGIC ---
-    
-    // 1. If history is empty, anchor to the original date input during task creation.
+    // 1. If history is empty, anchor to the original date input during task creation (which is initialLastCompleted).
     if (task.initialLastCompleted) {
         return createLocalDate(task.initialLastCompleted);
     }
@@ -126,7 +127,6 @@ function getScheduleAnchorDate(task) {
     const fallbackAnchor = new Date(now.getFullYear(), 0, 1); 
     fallbackAnchor.setDate(fallbackAnchor.getDate() - task.frequencyDays);
     return fallbackAnchor;
-    // --- END FINAL FALLBACK LOGIC ---
 }
 
 // --- Calendar Logic ---
@@ -184,12 +184,14 @@ function getRecurringDueDates(task, mStart, mEnd) {
     currentDate.setHours(0, 0, 0, 0); 
     // --- END CRITICAL RECURRENCE CALCULATION ---
 
+    // Get the first expected due date (the floor date)
+    const targetDueTime = task.targetDueDate ? createLocalDate(task.targetDueDate).getTime() : 0;
 
     while (currentDate.getTime() <= mEnd.getTime()) {
         
         const dateString = formatDate(currentDate);
         
-        if (currentDate.getTime() >= mStart.getTime()) {
+        if (currentDate.getTime() >= mStart.getTime() && currentDate.getTime() >= targetDueTime) {
              events[dateString] = { 
                 name: task.taskName + (task.isOneTime ? ' (1-Time)':''), 
                 overdue: currentDate.getTime() < getToday() 
@@ -343,9 +345,7 @@ function renderNotepads() {
         const expectedDueS = formatDate(expectedDue);
         
         const isCompletedToday = lastCompDate === todayS; 
-
         const isCurrentlyDueToday = expectedDueS === todayS || expectedDue.getTime() < getToday();
-
         const isDueThisWeek = expectedDue >= start && expectedDue <= end;
 
 
@@ -354,8 +354,8 @@ function renderNotepads() {
         const action = isCompletedToday ? `markUndone` : `markDone`;
 
         // ----------------------------------------------------------------------
-        // DAILY TASK LIST LOGIC
-        if (isCurrentlyDueToday || isCompletedToday) { 
+        // DAILY TASK LIST LOGIC: ONLY show if DUE TODAY or OVERDUE (regardless of completion)
+        if (isCurrentlyDueToday) { 
             dailyTasksCount++;
             const item = `<li class="${itemClass}"><span class="notepad-checkbox" onclick="${action}(${t.id})">${itemSymbol}</span>${t.taskName}</li>`;
             dl.innerHTML += item;
@@ -552,10 +552,14 @@ function registerFormListener() {
         }
 
         const targetDate = createLocalDate(inputDate);
+        
+        // Calculate initialLastCompleted (the date one cycle before the target date)
         const initialLastCompleted = new Date(targetDate);
-            
         initialLastCompleted.setDate(targetDate.getDate() - freq);
         lastCompletedDate = formatDate(initialLastCompleted);
+        
+        // Calculate the target due date (the date the user entered)
+        const targetDueS = formatDate(targetDate);
         
         const initialHistory = [];
 
@@ -566,7 +570,8 @@ function registerFormListener() {
             description: document.getElementById('description').value,
             frequencyDays: freq, 
             lastCompleted: lastCompletedDate, 
-            initialLastCompleted: lastCompletedDate, // *** Store the permanent anchor ***
+            initialLastCompleted: lastCompletedDate, // Permanent anchor
+            targetDueDate: targetDueS, // **New property for calendar floor**
             isOneTime: oneTime, 
             completionHistory: initialHistory 
         });
