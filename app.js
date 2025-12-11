@@ -83,7 +83,6 @@ function createLocalDate(dateString) {
     return new Date(parts[0], parts[1] - 1, parts[2]);
 }
 
-// *** UTC-BASED DATE CREATION FOR STABLE ANCHOR (Used by calendar logic) ***
 function createUTCDate(dateString) {
     const parts = dateString.split('-').map(p => parseInt(p, 10));
     return new Date(Date.UTC(parts[0], parts[1] - 1, parts[2]));
@@ -114,11 +113,21 @@ function getStatus(dueDate) {
     return { text: 'Upcoming', class: '', sortValue: diff };
 }
 
-// *** CRITICAL FIX: Use UTC-based date creation for the calendar anchor. ***
+// *** CRITICAL FIX: Base anchor date purely on the original target due date. ***
 function getScheduleAnchorDate(task) {
     const frequency = task.frequencyDays;
     
-    // 1. Anchor to the date one cycle BEFORE the oldest actual recorded completion.
+    // Fallback if targetDueDate is missing (shouldn't happen with new tasks)
+    if (!task.targetDueDate) {
+         if (task.initialLastCompleted) return createUTCDate(task.initialLastCompleted);
+         return createUTCDate(formatDate(new Date()));
+    }
+    
+    // The true anchor is the original target day, enforced with UTC for stability.
+    // NOTE: This date is used to establish the DayOfWeek pattern (e.g., Friday).
+    const targetDate = createUTCDate(task.targetDueDate);
+    
+    // If history exists, the stable starting point is one cycle BEFORE the *oldest* completion.
     if (task.completionHistory && task.completionHistory.length > 0) {
         const firstCompletion = task.completionHistory[0].dateOnly;
         const firstDate = createUTCDate(firstCompletion);
@@ -126,22 +135,9 @@ function getScheduleAnchorDate(task) {
         return firstDate;
     }
     
-    // 2. If history is empty, anchor to the permanent initial date input (which is initialLastCompleted).
-    if (task.initialLastCompleted) {
-        const initialAnchor = createUTCDate(task.initialLastCompleted);
-        initialAnchor.setUTCDate(initialAnchor.getUTCDate()); 
-        return initialAnchor;
-    }
-    
-    // 3. Default fallback 
-    if (task.lastCompleted) {
-        return createLocalDate(task.lastCompleted);
-    }
-    
-    const now = new Date();
-    const fallbackAnchor = new Date(now.getFullYear(), 0, 1); 
-    fallbackAnchor.setDate(fallbackAnchor.getDate() - frequency);
-    return fallbackAnchor;
+    // If history is empty, use the date one cycle before the original target date.
+    targetDate.setUTCDate(targetDate.getUTCDate() - frequency);
+    return targetDate;
 }
 
 // --- Calendar Logic ---
@@ -178,14 +174,11 @@ function getRecurringDueDates(task, mStart, mEnd) {
     
     const msPerDay = 86400000;
     
-    // The anchor is the day BEFORE the recurrence starts
+    // 1. Get the Anchor Date (the date one cycle before the true schedule starts)
     const anchorDate = getScheduleAnchorDate(task);
-    
-    // The target is the day the recurrence SHOULD START (or did start)
-    const targetDueDate = createLocalDate(task.targetDueDate);
-
-    // 1. Calculate the initial plotting point for the calendar view (mStart)
     const anchorTime = anchorDate.getTime();
+    
+    // 2. Get the date of the cycle that occurs just BEFORE mStart.
     const daysSinceAnchor = Math.round((mStart.getTime() - anchorTime) / msPerDay);
     const cyclesElapsed = Math.floor(daysSinceAnchor / frequency);
     
@@ -200,7 +193,8 @@ function getRecurringDueDates(task, mStart, mEnd) {
     
     // --- END CRITICAL RECURRENCE CALCULATION FIX ---
 
-    const targetDueTime = targetDueDate.getTime();
+    // Get the first expected due date (the floor date)
+    const targetDueTime = task.targetDueDate ? createLocalDate(task.targetDueDate).getTime() : 0;
 
     while (currentDate.getTime() <= mEnd.getTime()) {
         
