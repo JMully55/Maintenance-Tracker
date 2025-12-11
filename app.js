@@ -99,7 +99,7 @@ function getStatus(dueDate) {
     return { text: 'Upcoming', class: '', sortValue: diff };
 }
 
-// *** NEW UTILITY: Anchor for Stable Calendar Recurrence ***
+// *** NEW/UPDATED UTILITY: Anchor for Stable Calendar Recurrence ***
 function getScheduleAnchorDate(task) {
     if (task.completionHistory && task.completionHistory.length > 0) {
         // Find the oldest completion date in the history (the true schedule start)
@@ -290,6 +290,85 @@ function renderCompletedModal() {
 }
 
 // --- Dashboard Rendering (Updated to use new Notepad structure) ---
+function renderNotepads() {
+    const dl = document.getElementById('daily-tasks-list'), wl = document.getElementById('weekly-tasks-list');
+    if (!dl || !wl) return; 
+    
+    dl.innerHTML = ''; wl.innerHTML = ''; 
+    const now = new Date(); 
+    const dailyH3 = document.querySelector('.daily-focus h3');
+    if (dailyH3) dailyH3.textContent = `Today's Tasks (${formatDate(now)})`;
+    
+    const todayS = formatDate(now);
+    const start = new Date(now), end = new Date(start); 
+    start.setDate(now.getDate() - now.getDay()); start.setHours(0,0,0,0); 
+    end.setDate(start.getDate() + 6); end.setHours(23,59,59,999);
+
+    let dailyTasksCount = 0;
+    let weeklyTasksCount = 0;
+    
+    taskData.forEach((t) => {
+        if (t.isOneTime && t.frequencyDays === 0) return;
+
+        // 1. Calculate the 'Expected' Due Date based on the LAST recorded completion
+        const lastCompDate = t.lastCompleted;
+        const frequency = t.frequencyDays;
+        
+        let expectedDue = null;
+        if (lastCompDate) {
+            expectedDue = calculateDueDate(lastCompDate, frequency, t.isOneTime);
+        } else {
+            // For tasks with no history, they are immediately 'due'.
+            expectedDue = now; 
+        }
+
+        if (!expectedDue) return;
+
+        const expectedDueS = formatDate(expectedDue);
+        
+        // Check 1: Has this task already been marked complete TODAY?
+        const isCompletedToday = lastCompDate === todayS; 
+
+        // Check 2: Is the task due today or past due?
+        const isCurrentlyDueToday = expectedDueS === todayS || expectedDue.getTime() < getToday();
+
+        // Check 3: Is the task due this week (within the notepad timeframe)?
+        const isDueThisWeek = expectedDue >= start && expectedDue <= end;
+
+
+        // Determine Visual State and Action
+        const itemClass = isCompletedToday ? 'visually-complete' : '';
+        const itemSymbol = isCompletedToday ? '✔️' : '◻️';
+        const action = isCompletedToday ? `markUndone` : `markDone`;
+
+        // ----------------------------------------------------------------------
+        // DAILY TASK LIST LOGIC (Stays visible if due today or completed today)
+        if (isCurrentlyDueToday || isCompletedToday) { 
+            dailyTasksCount++;
+            const item = `<li class="${itemClass}"><span class="notepad-checkbox" onclick="${action}(${t.id})">${itemSymbol}</span>${t.taskName}</li>`;
+            dl.innerHTML += item;
+        }
+
+        // ----------------------------------------------------------------------
+        // WEEKLY TASK LIST LOGIC
+        if (isDueThisWeek || isCompletedToday) {
+             weeklyTasksCount++;
+             // Use expected due date unless it was completed today (then use today's date for display consistency)
+             const dueDisplay = isCompletedToday ? todayS : expectedDueS; 
+             const item = `<li class="${itemClass}"><span class="notepad-checkbox" onclick="${action}(${t.id})">${itemSymbol}</span>${t.taskName} (${dueDisplay})</li>`;
+             wl.innerHTML += item;
+        }
+    });
+
+    if (dailyTasksCount === 0) {
+        dl.innerHTML = '<li>🎉 Nothing scheduled for today!</li>';
+    } 
+
+    if (weeklyTasksCount === 0) {
+        wl.innerHTML = '<li>😌 Nothing scheduled for this week!</li>';
+    }
+}
+
 function renderDashboard() {
     // Renders the new "Action Board" notepad (previously the table)
     const list = document.getElementById('coming-up-list'); if (!list) return;
@@ -448,7 +527,7 @@ window.toggleFormVisibility = function() {
 }
 
 
-// --- Form Handling ---
+// --- Form Handling (FIXED to manually clear fields) ---
 function registerFormListener() {
     document.getElementById('task-form').onsubmit = (e) => {
         e.preventDefault();
@@ -487,7 +566,16 @@ function registerFormListener() {
             completionHistory: initialHistory 
         });
         renderDashboard(); 
-        e.target.reset(); 
-        toggleCustomFrequency();
+        
+        // *** FIX: Manually clear critical input fields for reliability ***
+        document.getElementById('taskName').value = '';
+        document.getElementById('category').value = ''; 
+        document.getElementById('description').value = '';
+        document.getElementById('dateInput').value = '';
+        document.getElementById('customDays').value = ''; 
+        document.getElementById('frequencySelect').value = '7'; // Set frequency back to default (Weekly)
+        toggleCustomFrequency(); // Hide custom input if it was visible
+        // *** END FIX ***
+        
     };
 }
