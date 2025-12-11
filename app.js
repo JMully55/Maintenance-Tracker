@@ -124,7 +124,6 @@ function getScheduleAnchorDate(task) {
     }
     
     // The true anchor is the original target day, enforced with UTC for stability.
-    // NOTE: This date is used to establish the DayOfWeek pattern (e.g., Friday).
     const targetDate = createUTCDate(task.targetDueDate);
     
     // If history exists, the stable starting point is one cycle BEFORE the *oldest* completion.
@@ -172,29 +171,39 @@ function getRecurringDueDates(task, mStart, mEnd) {
 
     // --- CRITICAL RECURRENCE CALCULATION FIX ---
     
-    const msPerDay = 86400000;
-    
-    // 1. Get the Anchor Date (the date one cycle before the true schedule starts)
+    // 1. Get the stable starting point for the recurrence pattern.
     const anchorDate = getScheduleAnchorDate(task);
+    
+    // 2. Determine the day of the week that the task is supposed to fall on (0=Sun, 6=Sat).
+    // Use the local day because mStart/mEnd are local dates.
+    const anchorDayOfWeek = anchorDate.getDay(); 
+    
+    // 3. Set the initial plotting date (currentDate) to the first day in the calendar view
+    // that matches the anchorDayOfWeek AND falls on or after the mStart date.
+    
+    let currentDate = new Date(mStart);
+    currentDate.setHours(0, 0, 0, 0);
+    
+    const startDayOfWeek = currentDate.getDay(); // Day of the week of mStart
+    const dayDiff = (anchorDayOfWeek - startDayOfWeek + 7) % 7;
+    currentDate.setDate(currentDate.getDate() + dayDiff);
+    currentDate.setHours(0, 0, 0, 0); // Re-align after setDate
+    
+    // If the calculated start date is still before the anchor (this happens if freq > 7),
+    // we need to step forward by cycles until we pass the anchor date.
+    const msPerDay = 86400000;
     const anchorTime = anchorDate.getTime();
     
-    // 2. Get the date of the cycle that occurs just BEFORE mStart.
-    const daysSinceAnchor = Math.round((mStart.getTime() - anchorTime) / msPerDay);
-    const cyclesElapsed = Math.floor(daysSinceAnchor / frequency);
+    while (currentDate.getTime() < anchorTime) {
+        currentDate.setDate(currentDate.getDate() + frequency);
+        currentDate.setHours(0, 0, 0, 0);
+    }
     
-    // Calculate the time of the recurrence cycle that falls *just before* mStart
-    let startTime = anchorTime + (cyclesElapsed * frequency * msPerDay);
-    
-    // Advance one more cycle to ensure we start plotting ON or AFTER mStart.
-    startTime += (frequency * msPerDay);
-    
-    let currentDate = new Date(startTime);
-    currentDate.setHours(0, 0, 0, 0); 
+    // Since the recurrence logic is now based on day-of-week/frequency combination, 
+    // we just need to enforce the targetDueDate as the absolute starting floor.
+    const targetDueTime = task.targetDueDate ? createLocalDate(task.targetDueDate).getTime() : 0;
     
     // --- END CRITICAL RECURRENCE CALCULATION FIX ---
-
-    // Get the first expected due date (the floor date)
-    const targetDueTime = task.targetDueDate ? createLocalDate(task.targetDueDate).getTime() : 0;
 
     while (currentDate.getTime() <= mEnd.getTime()) {
         
