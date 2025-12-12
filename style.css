@@ -301,8 +301,33 @@ tr:nth-child(even) { background-color: #fcfcfc; }
 }
 .calendar-day { background-color: #fff; padding: 8px; min-height: 90px; }
 .calendar-header { background-color: #ffb84d; color: #4a4a4a; text-align: center; padding: 5px; font-weight: bold; }
-.task-event { background-color: #5cb85c; color: white; padding: 2px 4px; margin-bottom: 2px; border-radius: 3px; font-size: 0.75em; }
-.task-event.overdue { background-color: #a94442; }
+
+/* --- CALENDAR EVENT STATUS COLORS (UPDATED FOR STABILITY/COMPLETED STATUS) --- */
+
+/* Default/Upcoming tasks (Original style was green, changing to blue for distinction) */
+.task-event { 
+    background-color: #4d94ff; 
+    color: white; 
+    padding: 2px 4px; 
+    margin-bottom: 2px; 
+    border-radius: 3px; 
+    font-size: 0.75em; 
+}
+
+/* Green for Completed Tasks (Based on 'completed' statusClass) */
+.task-event.completed { 
+    background-color: #5cb85c; 
+    color: white; 
+}
+
+/* Red for Overdue Tasks (Based on 'overdue' statusClass, only applies if NOT completed) */
+.task-event.overdue { 
+    background-color: #a94442; 
+    color: white; 
+}
+
+/* End Calendar Status Colors */
+
 .empty-day { background-color: #f9f9f9; color: #ccc; }
 
 /* Modal Styles (CRITICAL Z-INDEX FIX) */
