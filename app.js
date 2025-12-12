@@ -78,7 +78,6 @@ function formatTimestamp(isoString) {
     return `${date.toLocaleDateString()} ${date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
 }
 
-// *** FINAL FIX: Robust local date creation for dashboard lists ***
 function createLocalDate(dateString) {
     const parts = dateString.split('-').map(p => parseInt(p, 10));
     const d = new Date(parts[0], parts[1] - 1, parts[2]);
@@ -95,7 +94,7 @@ function createUTCDate(dateString) {
 // Function for simple, volatile due date calculation (used by dashboard list display)
 function calculateDueDateFromLastCompleted(lastComp, freqDays) {
     if (!lastComp) return null;
-    const lastDate = createLocalDate(lastComp); // Uses robust local date creation
+    const lastDate = createLocalDate(lastComp);
     const nextDate = new Date(lastDate);
     const frequency = parseInt(freqDays);
     if (isNaN(frequency)) return null;
@@ -116,8 +115,6 @@ function getStatus(dueDate) {
     return { text: 'Upcoming', class: '', sortValue: diff };
 }
 
-// NOTE: getScheduleAnchorDate is now largely irrelevant for the calendar display stability,
-// but it is kept to maintain the internal task data structure consistency for recurrence.
 function getScheduleAnchorDate(task) {
     const frequency = task.frequencyDays;
     
@@ -168,42 +165,73 @@ function getRecurringDueDates(task, mStart, mEnd) {
         return events;
     }
 
-    // --- CRITICAL RECURRENCE CALCULATION FIX ---
+    // --- RECURRENCE CALCULATION ---
     
-    const msPerDay = 86400000;
-    
-    // 1. Determine the target DOW from the immutable targetDueDate
     if (!task.targetDueDate) return events;
     const targetDueDate = createLocalDate(task.targetDueDate);
     const targetDueTime = targetDueDate.getTime();
-    const targetDOW = targetDueDate.getDay(); // 0 (Sun) to 6 (Sat)
+    const targetDOW = targetDueDate.getDay(); 
     
-    // 2. Find the first day in the calendar view (mStart) that matches the target DOW.
     let currentDate = new Date(mStart);
     currentDate.setHours(0, 0, 0, 0);
     
-    const startDayOfWeek = currentDate.getDay(); // Day of the week of mStart
+    const startDayOfWeek = currentDate.getDay(); 
     const dayDiff = (targetDOW - startDayOfWeek + 7) % 7;
     currentDate.setDate(currentDate.getDate() + dayDiff);
-    currentDate.setHours(0, 0, 0, 0); // Re-align after setDate
+    currentDate.setHours(0, 0, 0, 0); 
     
-    // 3. If the starting date is before the target date, advance to the first valid scheduled date.
+    // If the starting date is before the target date, advance to the first valid scheduled date.
     while (currentDate.getTime() < targetDueTime) {
         currentDate.setDate(currentDate.getDate() + frequency);
         currentDate.setHours(0, 0, 0, 0);
     }
     
-    // --- END CRITICAL RECURRENCE CALCULATION FIX ---
+    // --- END RECURRENCE CALCULATION ---
+    
+    // Helper to check if a task was completed on or after its last due date.
+    // This is the core logic for the calendar color status.
+    const isCompletedForCycle = (currentCycleDate) => {
+        // Calculate the previous due date for the current cycle
+        const prevCycleDate = new Date(currentCycleDate);
+        prevCycleDate.setDate(currentCycleDate.getDate() - frequency);
+        
+        const currentCycleStart = prevCycleDate.getTime();
+        const currentCycleEnd = currentCycleDate.getTime();
+
+        // Check completion history for any entry that falls within the current cycle period.
+        // Completion must be after the PREVIOUS cycle's due date and before the CURRENT cycle's due date.
+        for (const history of task.completionHistory) {
+            const completionTime = createLocalDate(history.dateOnly).getTime();
+            
+            // Completion must be within the period: (Previous Due Date, Current Due Date]
+            if (completionTime > currentCycleStart && completionTime <= currentCycleEnd) {
+                return true;
+            }
+        }
+        return false;
+    };
+
 
     while (currentDate.getTime() <= mEnd.getTime()) {
         
         const dateString = formatDate(currentDate);
+        const completionStatus = isCompletedForCycle(currentDate);
+        const isOverdue = currentDate.getTime() < getToday();
         
+        let statusClass = '';
+        if (completionStatus) {
+            statusClass = 'completed'; // New green status
+        } else if (isOverdue) {
+            statusClass = 'overdue'; // Red status only if NOT complete and overdue
+        } 
+        // Default (upcoming) remains the default style (blue/none)
+
         // Only plot if the date is within the current month view
         if (currentDate.getTime() >= mStart.getTime()) {
              events[dateString] = { 
                 name: task.taskName + (task.isOneTime ? ' (1-Time)':''), 
-                overdue: currentDate.getTime() < getToday() 
+                statusClass: statusClass,
+                overdue: isOverdue // Kept for legacy check if needed, but statusClass handles color
             };
         }
 
@@ -255,7 +283,9 @@ window.renderCalendar = function() {
         
         if (allEvents[ds]) {
             allEvents[ds].forEach(e => {
-                const eDiv = document.createElement('div'); eDiv.className='task-event' + (e.overdue?' overdue':'');
+                // *** FIX: Use the new statusClass for coloring ***
+                const eDiv = document.createElement('div'); 
+                eDiv.className='task-event' + (e.statusClass ? ' ' + e.statusClass : '');
                 eDiv.innerText = e.name; dDiv.appendChild(eDiv);
             });
         }
